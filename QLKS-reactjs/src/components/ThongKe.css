@@ -1,0 +1,5 @@
+/* ThongKe.css */
+.thongke-container { padding: 24px; }
+@media (max-width: 600px) {
+  .thongke-container { padding: 4px; }
+}

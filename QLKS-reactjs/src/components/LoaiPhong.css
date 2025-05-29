@@ -1,0 +1,20 @@
+/* LoaiPhong.css - hỗ trợ light/dark mode */
+.table-loaiphong {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--table-text, #222);
+}
+.table-loaiphong th, .table-loaiphong td {
+  border: 1px solid var(--table-border, #ddd);
+  padding: 8px;
+}
+.table-loaiphong th {
+  background-color: var(--table-th-bg, #e0f7fa);
+  text-align: left;
+}
+[data-theme='dark'] .table-loaiphong {
+  --table-bg: #23272f;
+  --table-text: #f1f1f1;
+  --table-border: #444;
+  --table-th-bg: #1e2a32;
+}

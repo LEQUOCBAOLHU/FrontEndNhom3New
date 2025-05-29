@@ -1,0 +1,26 @@
+/* SuDungDichVu.css - hỗ trợ light/dark mode */
+.table-sddv {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--table-text, #222);
+}
+.table-sddv th, .table-sddv td {
+  border: 1px solid var(--table-border, #ddd);
+  padding: 8px;
+}
+.table-sddv th {
+  background-color: var(--table-th-bg, #fff3e0);
+  text-align: left;
+}
+[data-theme='dark'] .table-sddv {
+  --table-bg: #23272f;
+  --table-text: #f1f1f1;
+  --table-border: #444;
+  --table-th-bg: #3a2c1a;
+}
+
+/* SuDungDichVu.css */
+.sudungdichvu-container { padding: 24px; }
+@media (max-width: 600px) {
+  .sudungdichvu-container { padding: 4px; }
+}
