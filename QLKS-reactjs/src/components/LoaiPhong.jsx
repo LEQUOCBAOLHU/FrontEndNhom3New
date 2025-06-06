@@ -1,354 +1,341 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, InputNumber, message, Space, Tag, Popconfirm } from 'antd';
-import { EditOutlined, DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
-import axios from 'axios';
-
-// Thêm interceptor cho axios để tự động đính kèm token
-axios.interceptors.request.use(
-    (config) => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            config.headers = config.headers || {};
-            config.headers['Authorization'] = `Bearer ${token}`;
-        }
-        return config;
-    },
-    (error) => Promise.reject(error)
-);
+import {
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+  Snackbar,
+  Alert,
+  CircularProgress,
+  TablePagination,
+  InputAdornment,
+} from '@mui/material';
+import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
+import { loaiPhongService } from '../services/loaiPhongService';
+import './LoaiPhong.css';
 
 const LoaiPhong = () => {
-    const [loaiPhongs, setLoaiPhongs] = useState([]);
-    const [isModalVisible, setIsModalVisible] = useState(false);
-    const [form] = Form.useForm();
-    const [loading, setLoading] = useState(false);
-    const [editingId, setEditingId] = useState(null);
-    const [pagination, setPagination] = useState({
-        current: 1,
-        pageSize: 10,
-        total: 0
+  const [loaiPhongList, setLoaiPhongList] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [selectedLoaiPhong, setSelectedLoaiPhong] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+  const [formData, setFormData] = useState({
+    tenLoaiPhong: '',
+    giaCoBan: '',
+    soNguoiToiDa: '',
+    moTa: '',
+  });
+  const [errors, setErrors] = useState({});
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
+  useEffect(() => {
+    fetchLoaiPhong();
+  }, [page, rowsPerPage]);
+
+  const fetchLoaiPhong = async () => {
+    setLoading(true);
+    try {
+      const response = await loaiPhongService.getAll(page + 1, rowsPerPage);
+      setLoaiPhongList(response.data?.loaiPhongs || []);
+      setTotalItems(response.data?.totalItems || 0);
+      setTotalPages(response.data?.totalPages || 0);
+    } catch (error) {
+      showSnackbar('Lỗi khi tải danh sách loại phòng', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.tenLoaiPhong) {
+      newErrors.tenLoaiPhong = 'Tên loại phòng không được để trống';
+    }
+    if (!formData.giaCoBan) {
+      newErrors.giaCoBan = 'Giá cơ bản không được để trống';
+    }
+    if (formData.giaCoBan && formData.giaCoBan < 0) {
+      newErrors.giaCoBan = 'Giá cơ bản không được âm';
+    }
+    if (!formData.soNguoiToiDa) {
+      newErrors.soNguoiToiDa = 'Số người tối đa không được để trống';
+    }
+    if (formData.soNguoiToiDa && formData.soNguoiToiDa < 1) {
+      newErrors.soNguoiToiDa = 'Số người tối đa phải lớn hơn 0';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleOpen = (loaiPhong = null) => {
+    if (loaiPhong) {
+      setSelectedLoaiPhong(loaiPhong);
+      setFormData({
+        tenLoaiPhong: loaiPhong.tenLoaiPhong,
+        giaCoBan: loaiPhong.giaCoBan || '',
+        soNguoiToiDa: loaiPhong.soNguoiToiDa || '',
+        moTa: loaiPhong.moTa || '',
+      });
+    } else {
+      setSelectedLoaiPhong(null);
+      setFormData({
+        tenLoaiPhong: '',
+        giaCoBan: '',
+        soNguoiToiDa: '',
+        moTa: '',
+      });
+    }
+    setErrors({});
+    setOpen(true);
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+    setSelectedLoaiPhong(null);
+    setFormData({
+      tenLoaiPhong: '',
+      giaCoBan: '',
+      soNguoiToiDa: '',
+      moTa: '',
     });
-    const [phongs, setPhongs] = useState([]);
-    const [selectedLoaiPhong, setSelectedLoaiPhong] = useState(null);
+    setErrors({});
+  };
 
-    const fetchLoaiPhongs = async (page = 1, pageSize = 10) => {
-        try {
-            setLoading(true);
-            let url = `http://localhost:5189/api/LoaiPhong?pageNumber=${page}&pageSize=${pageSize}`;
-            const response = await axios.get(url);
-            let dataArr = [];
-            let paginationData = {};
-            if (response.data.data) {
-                if (Array.isArray(response.data.data.loaiPhongs)) {
-                    dataArr = response.data.data.loaiPhongs;
-                    paginationData = {
-                        current: response.data.data.currentPage,
-                        pageSize: response.data.data.pageSize,
-                        total: response.data.data.totalItems
-                    };
-                } else if (Array.isArray(response.data.data)) {
-                    dataArr = response.data.data;
-                    paginationData = {
-                        current: 1,
-                        pageSize: dataArr.length,
-                        total: dataArr.length
-                    };
-                }
-            } else if (Array.isArray(response.data)) {
-                dataArr = response.data;
-                paginationData = {
-                    current: 1,
-                    pageSize: dataArr.length,
-                    total: dataArr.length
-                };
-            }
-            setLoaiPhongs(dataArr);
-            setPagination(paginationData);
-        } catch (error) {
-            message.error('Lỗi khi tải danh sách loại phòng');
-            console.error('Error fetching loai phong:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
 
-    const fetchPhongs = async () => {
-        try {
-            const response = await axios.get('http://localhost:5189/api/Phong?pageNumber=1&pageSize=1000');
-            let phongArr = [];
-            if (response.data.data) {
-                if (Array.isArray(response.data.data.phongs)) {
-                    phongArr = response.data.data.phongs;
-                } else if (Array.isArray(response.data.data)) {
-                    phongArr = response.data.data;
-                }
-            } else if (Array.isArray(response.data)) {
-                phongArr = response.data;
-            }
-            setPhongs(phongArr);
-        } catch (error) {
-            // Không cần báo lỗi nếu không lấy được phòng
-        }
-    };
+    setLoading(true);
+    try {
+      if (selectedLoaiPhong) {
+        await loaiPhongService.update(selectedLoaiPhong.maLoaiPhong, formData);
+        showSnackbar('Cập nhật loại phòng thành công', 'success');
+      } else {
+        await loaiPhongService.create(formData);
+        showSnackbar('Thêm loại phòng thành công', 'success');
+      }
+      fetchLoaiPhong();
+      handleClose();
+    } catch (error) {
+      showSnackbar('Lỗi khi lưu loại phòng', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    useEffect(() => {
-        fetchLoaiPhongs();
-        fetchPhongs();
-    }, []);
+  const handleDelete = async (maLoaiPhong) => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa loại phòng này?')) {
+      setLoading(true);
+      try {
+        await loaiPhongService.delete(maLoaiPhong);
+        showSnackbar('Xóa loại phòng thành công', 'success');
+        fetchLoaiPhong();
+      } catch (error) {
+        showSnackbar('Lỗi khi xóa loại phòng', 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
 
-    const handleTableChange = (pagination) => {
-        fetchLoaiPhongs(pagination.current, pagination.pageSize);
-    };
+  const showSnackbar = (message, severity) => {
+    setSnackbar({
+      open: true,
+      message,
+      severity,
+    });
+  };
 
-    const showModal = (record = null) => {
-        if (record) {
-            form.setFieldsValue({
-                tenLoaiPhong: record.tenLoaiPhong,
-                giaCoBan: record.giaCoBan,
-                soNguoiToiDa: record.soNguoiToiDa
-            });
-            setEditingId(record.maLoaiPhong);
-        } else {
-            form.resetFields();
-            setEditingId(null);
-        }
-        setIsModalVisible(true);
-    };
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
 
-    const handleCancel = () => {
-        setIsModalVisible(false);
-        form.resetFields();
-        setEditingId(null);
-    };
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
 
-    const handleSubmit = async () => {
-        try {
-            const values = await form.validateFields();
-            if (editingId) {
-                // Cập nhật loại phòng
-                await axios.put(`http://localhost:5189/api/LoaiPhong/${editingId}`, values);
-                message.success('Cập nhật loại phòng thành công');
-            } else {
-                // Thêm loại phòng mới
-                await axios.post('http://localhost:5189/api/LoaiPhong', values);
-                message.success('Thêm loại phòng thành công');
-            }
-            setIsModalVisible(false);
-            form.resetFields();
-            fetchLoaiPhongs(pagination.current, pagination.pageSize);
-        } catch (error) {
-            if (error.response?.data?.message) {
-                message.error(error.response.data.message);
-            } else {
-                message.error('Có lỗi xảy ra');
-            }
-            console.error('Error submitting form:', error);
-        }
-    };
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
-    const handleDelete = async (maLoaiPhong) => {
-        try {
-            await axios.delete(`http://localhost:5189/api/LoaiPhong/${maLoaiPhong}`);
-            message.success('Xóa loại phòng thành công');
-            fetchLoaiPhongs(pagination.current, pagination.pageSize);
-        } catch (error) {
-            if (error.response?.data?.message) {
-                message.error(error.response.data.message);
-            } else {
-                message.error('Có lỗi xảy ra khi xóa loại phòng');
-            }
-            console.error('Error deleting loai phong:', error);
-        }
-    };
+  return (
+    <Box sx={{ p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+        <Typography variant="h4" component="h1">
+          Quản lý Loại Phòng
+        </Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<AddIcon />}
+          onClick={() => handleOpen()}
+        >
+          Thêm loại phòng mới
+        </Button>
+      </Box>
 
-    const getSoLuongPhong = (maLoaiPhong) => {
-        return phongs.filter(p => p.maLoaiPhong === maLoaiPhong).length;
-    };
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Mã loại phòng</TableCell>
+                <TableCell>Tên loại phòng</TableCell>
+                <TableCell>Giá cơ bản</TableCell>
+                <TableCell>Số người tối đa</TableCell>
+                <TableCell>Mô tả</TableCell>
+                <TableCell>Thao tác</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loaiPhongList.map((loaiPhong) => (
+                <TableRow key={loaiPhong.maLoaiPhong}>
+                  <TableCell>{loaiPhong.maLoaiPhong}</TableCell>
+                  <TableCell>{loaiPhong.tenLoaiPhong}</TableCell>
+                  <TableCell>{loaiPhong.giaCoBan?.toLocaleString('vi-VN')} VNĐ</TableCell>
+                  <TableCell>{loaiPhong.soNguoiToiDa}</TableCell>
+                  <TableCell>{loaiPhong.moTa}</TableCell>
+                  <TableCell>
+                    <IconButton onClick={() => handleOpen(loaiPhong)} color="primary">
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton onClick={() => handleDelete(loaiPhong.maLoaiPhong)} color="error">
+                      <DeleteIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <TablePagination
+            component="div"
+            count={totalItems}
+            page={page}
+            onPageChange={handleChangePage}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+            labelRowsPerPage="Số hàng mỗi trang"
+            labelDisplayedRows={({ from, to, count }) => `${from}-${to} của ${count}`}
+          />
+        </TableContainer>
+      )}
 
-    const showDetailModal = (record) => {
-        setSelectedLoaiPhong(record);
-    };
-
-    const handleCloseDetailModal = () => {
-        setSelectedLoaiPhong(null);
-    };
-
-    const columns = [
-        {
-            title: 'Mã loại phòng',
-            dataIndex: 'maLoaiPhong',
-            key: 'maLoaiPhong',
-            sorter: (a, b) => a.maLoaiPhong - b.maLoaiPhong,
-            align: 'center',
-        },
-        {
-            title: 'Tên loại phòng',
-            dataIndex: 'tenLoaiPhong',
-            key: 'tenLoaiPhong',
-            sorter: (a, b) => a.tenLoaiPhong.localeCompare(b.tenLoaiPhong),
-            align: 'center',
-            render: (text, record) => (
-                <Button type="link" onClick={() => showDetailModal(record)}>{text}</Button>
-            ),
-        },
-        {
-            title: 'Giá cơ bản',
-            dataIndex: 'giaCoBan',
-            key: 'giaCoBan',
-            render: (text) => text ? `${Number(text).toLocaleString('vi-VN')} VNĐ` : '-',
-            sorter: (a, b) => a.giaCoBan - b.giaCoBan,
-            align: 'center',
-        },
-        {
-            title: 'Số người tối đa',
-            dataIndex: 'soNguoiToiDa',
-            key: 'soNguoiToiDa',
-            sorter: (a, b) => a.soNguoiToiDa - b.soNguoiToiDa,
-            align: 'center',
-        },
-        {
-            title: 'Số lượng phòng',
-            key: 'soLuongPhong',
-            align: 'center',
-            render: (_, record) => getSoLuongPhong(record.maLoaiPhong),
-        },
-        {
-            title: 'Thao tác',
-            key: 'action',
-            align: 'center',
-            render: (_, record) => (
-                <Space size="middle">
-                    <Button
-                        type="primary"
-                        icon={<EditOutlined />}
-                        onClick={() => showModal(record)}
-                    >
-                        Sửa
-                    </Button>
-                    <Popconfirm
-                        title="Bạn có chắc chắn muốn xóa loại phòng này?"
-                        onConfirm={() => handleDelete(record.maLoaiPhong)}
-                        okText="Có"
-                        cancelText="Không"
-                    >
-                        <Button
-                            type="primary"
-                            danger
-                            icon={<DeleteOutlined />}
-                        >
-                            Xóa
-                        </Button>
-                    </Popconfirm>
-                </Space>
-            ),
-        },
-    ];
-
-    return (
-        <div style={{ padding: '20px' }}>
-            <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h2>Quản lý loại phòng</h2>
-                <Space>
-                    <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        onClick={() => showModal()}
-                    >
-                        Thêm loại phòng
-                    </Button>
-                    <Button
-                        icon={<ReloadOutlined />}
-                        onClick={() => fetchLoaiPhongs(pagination.current, pagination.pageSize)}
-                    >
-                        Làm mới
-                    </Button>
-                </Space>
-            </div>
-
-            <Table
-                columns={columns}
-                dataSource={loaiPhongs}
-                rowKey="maLoaiPhong"
-                pagination={pagination}
-                loading={loading}
-                onChange={handleTableChange}
-                locale={{ emptyText: 'Không có dữ liệu loại phòng' }}
-                bordered
+      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          {selectedLoaiPhong ? 'Chỉnh sửa loại phòng' : 'Thêm loại phòng mới'}
+        </DialogTitle>
+        <DialogContent>
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+            <TextField
+              fullWidth
+              label="Tên loại phòng"
+              value={formData.tenLoaiPhong}
+              onChange={(e) => setFormData({ ...formData, tenLoaiPhong: e.target.value })}
+              margin="normal"
+              required
+              error={!!errors.tenLoaiPhong}
+              helperText={errors.tenLoaiPhong}
             />
+            <TextField
+              fullWidth
+              label="Giá cơ bản"
+              type="number"
+              value={formData.giaCoBan}
+              onChange={(e) => setFormData({ ...formData, giaCoBan: e.target.value })}
+              margin="normal"
+              required
+              error={!!errors.giaCoBan}
+              helperText={errors.giaCoBan}
+              InputProps={{
+                endAdornment: <InputAdornment position="end">VNĐ</InputAdornment>,
+              }}
+            />
+            <TextField
+              fullWidth
+              label="Số người tối đa"
+              type="number"
+              value={formData.soNguoiToiDa}
+              onChange={(e) => setFormData({ ...formData, soNguoiToiDa: e.target.value })}
+              margin="normal"
+              required
+              error={!!errors.soNguoiToiDa}
+              helperText={errors.soNguoiToiDa}
+              InputProps={{
+                inputProps: { min: 1 }
+              }}
+            />
+            <TextField
+              fullWidth
+              label="Mô tả"
+              value={formData.moTa}
+              onChange={(e) => setFormData({ ...formData, moTa: e.target.value })}
+              margin="normal"
+              multiline
+              rows={3}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClose}>Hủy</Button>
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            color="primary"
+            disabled={loading}
+          >
+            {loading ? (
+              <CircularProgress size={24} />
+            ) : selectedLoaiPhong ? (
+              'Cập nhật'
+            ) : (
+              'Thêm mới'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-            <Modal
-                title={editingId ? "Sửa loại phòng" : "Thêm loại phòng mới"}
-                open={isModalVisible}
-                onOk={handleSubmit}
-                onCancel={handleCancel}
-                okText={editingId ? "Cập nhật" : "Thêm"}
-                cancelText="Hủy"
-            >
-                <Form
-                    form={form}
-                    layout="vertical"
-                >
-                    <Form.Item
-                        name="tenLoaiPhong"
-                        label="Tên loại phòng"
-                        rules={[{ required: true, message: 'Vui lòng nhập tên loại phòng' }]}
-                    >
-                        <Input />
-                    </Form.Item>
-                    <Form.Item
-                        name="giaCoBan"
-                        label="Giá cơ bản"
-                        rules={[{ required: true, message: 'Vui lòng nhập giá cơ bản' }]}
-                    >
-                        <InputNumber
-                            style={{ width: '100%' }}
-                            formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                            parser={value => value.replace(/\$\s?|(,*)/g, '')}
-                            min={0}
-                        />
-                    </Form.Item>
-                    <Form.Item
-                        name="soNguoiToiDa"
-                        label="Số người tối đa"
-                        rules={[{ required: true, message: 'Vui lòng nhập số người tối đa' }]}
-                    >
-                        <InputNumber
-                            style={{ width: '100%' }}
-                            min={1}
-                        />
-                    </Form.Item>
-                </Form>
-            </Modal>
-
-            <Modal
-                title={selectedLoaiPhong ? `Chi tiết loại phòng: ${selectedLoaiPhong.tenLoaiPhong}` : ''}
-                open={!!selectedLoaiPhong}
-                onCancel={handleCloseDetailModal}
-                footer={null}
-                width={700}
-            >
-                {selectedLoaiPhong && (
-                    <div>
-                        <p><b>Mã loại phòng:</b> {selectedLoaiPhong.maLoaiPhong}</p>
-                        <p><b>Tên loại phòng:</b> {selectedLoaiPhong.tenLoaiPhong}</p>
-                        <p><b>Giá cơ bản:</b> {selectedLoaiPhong.giaCoBan?.toLocaleString('vi-VN')} VNĐ</p>
-                        <p><b>Số người tối đa:</b> {selectedLoaiPhong.soNguoiToiDa}</p>
-                        <h4>Danh sách phòng thuộc loại này:</h4>
-                        <Table
-                            columns={[
-                                { title: 'Mã phòng', dataIndex: 'maPhong', key: 'maPhong' },
-                                { title: 'Tên phòng', dataIndex: 'tenPhong', key: 'tenPhong' },
-                                { title: 'Trạng thái', dataIndex: 'trangThai', key: 'trangThai', render: (text) => <Tag>{text}</Tag> },
-                            ]}
-                            dataSource={phongs.filter(p => p.maLoaiPhong === selectedLoaiPhong.maLoaiPhong)}
-                            rowKey="maPhong"
-                            pagination={false}
-                            size="small"
-                        />
-                    </div>
-                )}
-            </Modal>
-        </div>
-    );
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
 };
 
 export default LoaiPhong;

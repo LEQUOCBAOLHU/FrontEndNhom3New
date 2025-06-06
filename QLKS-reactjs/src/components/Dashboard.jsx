@@ -37,6 +37,7 @@ import ForgotPassword from './ForgotPassword';
 const menuItems = [
   { icon: <BiHome size={24} />, label: 'Dashboard', path: '/dashboard' },
   { icon: <MdHotel size={24} />, label: 'Phòng', path: '/dashboard/phong' },
+  { icon: <MdMeetingRoom size={24} />, label: 'Loại phòng', path: '/dashboard/loaiphong' },
   { icon: <MdRoomService size={24} />, label: 'Dịch vụ', path: '/dashboard/dichvu' },
   { icon: <BiUser size={24} />, label: 'Khách hàng', path: '/dashboard/khachhang' },
   { icon: <BiUser size={24} />, label: 'Nhân viên', path: '/dashboard/nhanvien', adminOnly: true },

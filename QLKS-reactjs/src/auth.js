@@ -20,7 +20,7 @@ const openDB = () => {
   });
 };
 
-const getToken = async () => {
+export const getToken = async () => {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(['tokens'], 'readonly');
