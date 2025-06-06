@@ -33,7 +33,7 @@ const PhuThu = () => {
 
   const fetchLoaiPhongs = async () => {
     try {
-      const res = await apiFetch('http://localhost:5189/api/LoaiPhong?pageNumber=1&pageSize=100');
+      const res = await apiFetch('https://qlks-0dvh.onrender.com/api/LoaiPhong?pageNumber=1&pageSize=100');
       const data = await res.json();
       if (data && data.data) {
         setLoaiPhongs(data.data.loaiPhongs || []);
@@ -46,7 +46,7 @@ const PhuThu = () => {
   const fetchPhuThus = async (page = 1, pageSize = 10) => {
     setLoading(true);
     try {
-      const res = await apiFetch(`http://localhost:5189/api/PhuThu?pageNumber=${page}&pageSize=${pageSize}`);
+      const res = await apiFetch(`https://qlks-0dvh.onrender.com/api/PhuThu?pageNumber=${page}&pageSize=${pageSize}`);
       const data = await res.json();
       if (data && data.data) {
         setPhuThus(data.data.phuThus || []);
@@ -95,11 +95,11 @@ const PhuThu = () => {
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
-      let url = 'http://localhost:5189/api/PhuThu';
+      let url = 'https://qlks-0dvh.onrender.com/api/PhuThu';
       let method = 'POST';
 
       if (editingPhuThu) {
-        url = `http://localhost:5189/api/PhuThu/${editingPhuThu.maPhuThu}`;
+        url = `https://qlks-0dvh.onrender.com/api/PhuThu/${editingPhuThu.maPhuThu}`;
         method = 'PUT';
       }
 
@@ -124,7 +124,7 @@ const PhuThu = () => {
 
   const handleDelete = async (maPhuThu) => {
     try {
-      const response = await apiFetch(`http://localhost:5189/api/PhuThu/${maPhuThu}`, {
+      const response = await apiFetch(`https://qlks-0dvh.onrender.com/api/PhuThu/${maPhuThu}`, {
         method: 'DELETE',
       });
       if (response.ok) {

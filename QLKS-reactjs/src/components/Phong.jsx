@@ -57,7 +57,7 @@ function Phong() {
   const fetchRoomStats = async () => {
     try {
       const timestamp = new Date().getTime();
-      const response = await apiFetch(`http://localhost:5189/api/Phong/thong-ke-trang-thai?t=${timestamp}`);
+      const response = await apiFetch(`https://qlks-0dvh.onrender.com/api/Phong/thong-ke-trang-thai?t=${timestamp}`);
       if (response.ok) {
         const data = await response.json();
         // API trả về object với key là trạng thái và value là count
@@ -74,7 +74,7 @@ function Phong() {
     try {
       // Thêm cache-busting parameter để đảm bảo dữ liệu luôn mới
       const timestamp = new Date().getTime();
-      const response = await apiFetch(`http://localhost:5189/api/Phong?pageNumber=1&pageSize=999&t=${timestamp}`);
+      const response = await apiFetch(`https://qlks-0dvh.onrender.com/api/Phong?pageNumber=1&pageSize=999&t=${timestamp}`);
       if (response.ok) {
         const data = await response.json();
         const list = Array.isArray(data) ? data : (data.data?.phongs || []);
@@ -100,7 +100,7 @@ function Phong() {
   const fetchRooms = async (page = 1, pageSize = 10) => {
     try {
       setLoading(true);
-      const response = await apiFetch(`http://localhost:5189/api/Phong?pageNumber=${page}&pageSize=${pageSize}`);
+      const response = await apiFetch(`https://qlks-0dvh.onrender.com/api/Phong?pageNumber=${page}&pageSize=${pageSize}`);
       if (response.ok) {
         const data = await response.json();
         // Lấy đúng mảng phòng từ backend (dạng phân trang)
@@ -132,7 +132,7 @@ function Phong() {
 
   const fetchLoaiPhongs = async () => {
     try {
-      const res = await apiFetch('http://localhost:5189/api/LoaiPhong?pageNumber=1&pageSize=100');
+      const res = await apiFetch('https://qlks-0dvh.onrender.com/api/LoaiPhong?pageNumber=1&pageSize=100');
       const data = await res.json();
       if (data.data) {
         setLoaiPhongs(data.data.loaiPhongs);
@@ -145,7 +145,7 @@ function Phong() {
   const fetchRoomsByTrangThai = async (trangThai) => {
     try {
       setLoading(true);
-      const response = await apiFetch(`http://localhost:5189/api/Phong/trang-thai/${trangThai}?pageNumber=1&pageSize=100`);
+      const response = await apiFetch(`https://qlks-0dvh.onrender.com/api/Phong/trang-thai/${trangThai}?pageNumber=1&pageSize=100`);
       if (response.ok) {
         const data = await response.json();
         const list = data.data?.phongs || [];
@@ -271,7 +271,7 @@ function Phong() {
   const handleUpdateStatus = async (values) => {
     if (!selectedPhong) return;
     try {
-      const response = await apiFetch(`http://localhost:5189/api/Phong/${selectedPhong.maPhong}/trang-thai`, {
+      const response = await apiFetch(`https://qlks-0dvh.onrender.com/api/Phong/${selectedPhong.maPhong}/trang-thai`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ trangThai: values.trangThai })
@@ -294,7 +294,7 @@ function Phong() {
 
   const handleAddRoom = async (values) => {
     try {
-      const response = await apiFetch('http://localhost:5189/api/Phong', {
+      const response = await apiFetch('https://qlks-0dvh.onrender.com/api/Phong', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
@@ -331,16 +331,16 @@ function Phong() {
 
   const handleViewDetails = async (record) => {
     try {
-        const response = await apiFetch(`http://localhost:5189/api/Phong/${record.maPhong}`);
-        const data = await response.json();
-        if(response.ok) {
-            setSelectedPhong(data.data);
-            setIsStatusModalVisible(true);
-        } else {
-            message.error(data.message || "Không thể lấy chi tiết phòng.");
-        }
+      const response = await apiFetch(`https://qlks-0dvh.onrender.com/api/Phong/${record.maPhong}`);
+      const data = await response.json();
+      if(response.ok) {
+        setSelectedPhong(data.data);
+        setIsStatusModalVisible(true);
+      } else {
+        message.error(data.message || "Không thể lấy chi tiết phòng.");
+      }
     } catch(err) {
-        message.error("Lỗi khi lấy chi tiết phòng.");
+      message.error("Lỗi khi lấy chi tiết phòng.");
     }
   };
 
@@ -358,7 +358,7 @@ function Phong() {
       let result = {};
 
       if (editingId) {
-        const response = await apiFetch(`http://localhost:5189/api/Phong/${editingId}`, {
+        const response = await apiFetch(`https://qlks-0dvh.onrender.com/api/Phong/${editingId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(values),
@@ -411,7 +411,7 @@ function Phong() {
 
   const handleDelete = async (maPhong) => {
     try {
-      const response = await apiFetch(`http://localhost:5189/api/Phong/${maPhong}`, { method: 'DELETE' });
+      const response = await apiFetch(`https://qlks-0dvh.onrender.com/api/Phong/${maPhong}`, { method: 'DELETE' });
       if(response.ok){
         message.success('Xóa phòng thành công!');
         // Thay vì fetchRooms, gọi lại fetchAllRooms
@@ -451,7 +451,7 @@ function Phong() {
         // Chỉ kiểm tra phòng "Trống" hoặc "Bảo trì" để xem có thể available không
         if (phong.trangThai === 'Đang sử dụng') continue;
 
-        const response = await apiFetch(`http://localhost:5189/api/Phong/${phong.maPhong}`);
+        const response = await apiFetch(`https://qlks-0dvh.onrender.com/api/Phong/${phong.maPhong}`);
         const phongDetails = await response.json();
         
         const bookings = phongDetails.data?.chiTietDatPhongs || [];
