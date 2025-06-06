@@ -1,0 +1,7 @@
+/* Account.css */
+.account-container { padding: 24px; }
+.account-table { width: 100%; }
+@media (max-width: 600px) {
+  .account-container { padding: 4px; }
+  .account-table { font-size: 13px; }
+}
