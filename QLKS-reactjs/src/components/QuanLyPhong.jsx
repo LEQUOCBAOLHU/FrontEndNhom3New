@@ -10,7 +10,7 @@ function QuanLyPhong() {
   const fetchAllRooms = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch('http://localhost:5189/api/Phong/get-all');
+      const res = await apiFetch('https://qlks-0dvh.onrender.com/api/Phong/get-all');
       const data = await res.json();
       setPhongs(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -22,7 +22,7 @@ function QuanLyPhong() {
 
   const fetchStats = async () => {
     try {
-      const res = await apiFetch('http://localhost:5189/api/Phong/thong-ke-trang-thai');
+      const res = await apiFetch('https://qlks-0dvh.onrender.com/api/Phong/thong-ke-trang-thai');
       const data = await res.json();
       setStats(data);
     } catch {

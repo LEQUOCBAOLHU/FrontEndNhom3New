@@ -30,7 +30,7 @@ function SuDungDichVu() {
   };
 
   // Đổi endpoint API Sử dụng dịch vụ sang API mới
-  const SDDV_API = 'https://localhost:7274/api/SuDungDichVu';
+  const SDDV_API = 'https://qlks-0dvh.onrender.com/api/SuDungDichVu';
 
   const fetchData = async () => {
     setLoading(true);
@@ -54,7 +54,7 @@ function SuDungDichVu() {
 
   const fetchDatPhongs = async () => {
     try {
-      const res = await apiFetch('http://localhost:5189/api/DatPhong?pageNumber=1&pageSize=100');
+      const res = await apiFetch('https://qlks-0dvh.onrender.com/api/DatPhong?pageNumber=1&pageSize=100');
       const resData = await res.json();
       if (resData.data?.datPhongs) {
         setDatPhongs(resData.data.datPhongs);
@@ -71,7 +71,7 @@ function SuDungDichVu() {
 
   const fetchDichVus = async () => {
     try {
-      const res = await apiFetch('http://localhost:5189/api/DichVu?pageNumber=1&pageSize=100');
+      const res = await apiFetch('https://qlks-0dvh.onrender.com/api/DichVu?pageNumber=1&pageSize=100');
       const resData = await res.json();
       if (resData.data?.dichVus) {
         setDichVus(resData.data.dichVus);

@@ -1,6 +1,6 @@
 import { apiFetch } from '../auth';
 
-const API_URL = 'https://localhost:7274/api/PhuThu';
+const API_URL = 'https://qlks-0dvh.onrender.com/api/PhuThu';
 
 export const phuThuService = {
   getAll: async (pageNumber = 1, pageSize = 10) => {

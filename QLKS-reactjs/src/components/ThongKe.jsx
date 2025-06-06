@@ -26,8 +26,8 @@ function ThongKe() {
   const fetchStats = async (y, m) => {
     setLoading(true);
     try {
-      const yearPromise = apiFetch(`http://localhost:5189/api/ThongKe/nam?nam=${y}`);
-      const monthPromise = apiFetch(`http://localhost:5189/api/ThongKe/thang?nam=${y}&thang=${m}`);
+      const yearPromise = apiFetch(`https://qlks-0dvh.onrender.com/api/ThongKe/nam?nam=${y}`);
+      const monthPromise = apiFetch(`https://qlks-0dvh.onrender.com/api/ThongKe/thang?nam=${y}&thang=${m}`);
       
       const [yearRes, monthRes] = await Promise.all([yearPromise, monthPromise]);
       
@@ -65,7 +65,7 @@ function ThongKe() {
     try {
       const tuNgay = dateRange[0].format('YYYY-MM-DD');
       const denNgay = dateRange[1].format('YYYY-MM-DD');
-      const res = await apiFetch(`http://localhost:5189/api/ThongKe/khoang-thoi-gian?tuNgay=${tuNgay}&denNgay=${denNgay}`);
+      const res = await apiFetch(`https://qlks-0dvh.onrender.com/api/ThongKe/khoang-thoi-gian?tuNgay=${tuNgay}&denNgay=${denNgay}`);
       if (!res.ok) {
         throw new Error('Không thể tải doanh thu cho khoảng thời gian tùy chỉnh.');
       }

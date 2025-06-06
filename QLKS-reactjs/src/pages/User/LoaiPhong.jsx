@@ -4,7 +4,7 @@ import { apiFetch } from '../../auth';
 function UserLoaiPhong() {
   const [loaiPhongs, setLoaiPhongs] = useState([]);
   useEffect(() => {
-    apiFetch('http://localhost:5189/api/LoaiPhong')
+    apiFetch('https://qlks-0dvh.onrender.com/api/LoaiPhong')
       .then(res => res.json())
       .then(data => setLoaiPhongs(data));
   }, []);

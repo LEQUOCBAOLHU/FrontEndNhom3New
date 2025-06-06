@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { getToken } from '../auth'; // Import getToken
 
-const API_URL = 'https://localhost:7274/api/LoaiPhong';
+const API_URL = 'https://qlks-0dvh.onrender.com/api/LoaiPhong';
 
 // Only add the interceptor once
 if (!window._loaiPhongInterceptorAdded) {

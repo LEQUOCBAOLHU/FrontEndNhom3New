@@ -14,7 +14,7 @@ export default function TichDiemAdmin() {
   const fetchTichDiem = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch('http://localhost:5189/api/TichDiem?pageNumber=1&pageSize=100');
+      const res = await apiFetch('https://qlks-0dvh.onrender.com/api/TichDiem?pageNumber=1&pageSize=100');
       const json = await res.json();
       let list = Array.isArray(json) ? json : (json.data?.lichSuTichDiems || json.lichSuTichDiems || json.LichSuTichDiems || []);
       setData(list);

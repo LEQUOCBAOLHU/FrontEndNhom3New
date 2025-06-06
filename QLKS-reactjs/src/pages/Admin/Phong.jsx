@@ -4,7 +4,7 @@ import { apiFetch } from '../../auth';
 function AdminPhong() {
   const [phongs, setPhongs] = useState([]);
   useEffect(() => {
-    apiFetch('http://localhost:5189/api/Phong')
+    apiFetch('https://qlks-0dvh.onrender.com/api/Phong')
       .then(res => res.json())
       .then(data => setPhongs(data));
   }, []);
