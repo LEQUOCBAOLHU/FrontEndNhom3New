@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, DatePicker, Space, Popconfirm, message, Select, InputNumber, Spin } from 'antd';
+import { Table, Button, Modal, Form, DatePicker, Space, Popconfirm, message, Select, InputNumber, Spin, Descriptions, List } from 'antd';
 import { apiFetch } from '../auth';
 import dayjs from 'dayjs';
 import './DatPhong.css';
+import { useNavigate } from 'react-router-dom';
 
 function DatPhong() {
   const [datPhongs, setDatPhongs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingDatPhong, setEditingDatPhong] = useState(null);
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+  const [chiTietDatPhong, setChiTietDatPhong] = useState(null);
   const [phongs, setPhongs] = useState([]);
   const [khachHangs, setKhachHangs] = useState([]);
   const [loadingPhong, setLoadingPhong] = useState(false);
   const [loadingKhachHang, setLoadingKhachHang] = useState(false);
   const [form] = Form.useForm();
+  const navigate = useNavigate();
 
   // Lấy danh sách đặt phòng
   const fetchDatPhongs = async () => {
@@ -127,6 +131,26 @@ function DatPhong() {
     await Promise.all([fetchDatPhongs(), fetchPhongs(), fetchKhachHangs()]);
   };
 
+  const handleCreateInvoice = async (datPhong) => {
+    try {
+      const res = await apiFetch(`http://localhost:5189/api/HoaDon/from-dat-phong/${datPhong.maDatPhong}`, {
+        method: 'POST',
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Tạo hóa đơn thất bại');
+      }
+
+      const newInvoice = await res.json();
+      message.success(`Tạo hóa đơn ${newInvoice.data.maHoaDon} thành công!`);
+      navigate('/dashboard/hoadon'); 
+    } catch (e) {
+      console.error('Error creating invoice from booking:', e);
+      message.error(`Lỗi: ${e.message}`);
+    }
+  };
+
   // Xử lý xóa đặt phòng
   const handleDelete = async (maDatPhong) => {
     try {
@@ -165,6 +189,24 @@ function DatPhong() {
         form.setFieldsValue({ soNguoiO: 1 });
       }
     }, 0);
+  };
+
+  const showDetailModal = async (maDatPhong) => {
+    setLoading(true);
+    try {
+      const res = await apiFetch(`http://localhost:5189/api/DatPhong/${maDatPhong}`);
+      const data = await res.json();
+      if (data.data) {
+        setChiTietDatPhong(data.data);
+        setIsDetailModalVisible(true);
+      } else {
+        message.error('Không thể tải chi tiết đặt phòng!');
+      }
+    } catch (error) {
+      message.error('Lỗi khi tải chi tiết đặt phòng!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Xử lý thêm/sửa đặt phòng
@@ -302,14 +344,28 @@ function DatPhong() {
     { title: 'Trạng thái', dataIndex: 'trangThai', key: 'trangThai' },
     { title: 'Phụ thu', dataIndex: 'phuThu', key: 'phuThu', render: (value) => (value != null ? value : 0) },
     {
-      title: 'Hành động',
+      title: 'Thao tác',
       key: 'action',
       render: (_, record) => (
-        <Space>
-          <Button onClick={() => showModal(record)}>Sửa</Button>
-          <Popconfirm title="Bạn chắc chắn xóa?" onConfirm={() => handleDelete(record.maDatPhong)}>
+        <Space size="middle">
+          <Button onClick={() => showDetailModal(record.maDatPhong)}>Xem chi tiết</Button>
+          <Button type="primary" onClick={() => showModal(record)}>Sửa</Button>
+          <Popconfirm
+            title="Bạn có chắc muốn xóa?"
+            onConfirm={() => handleDelete(record.maDatPhong)}
+            okText="Có"
+            cancelText="Không"
+          >
             <Button danger>Xóa</Button>
           </Popconfirm>
+          <Button 
+            type="primary" 
+            ghost 
+            onClick={() => handleCreateInvoice(record)}
+            disabled={record.trangThai === 'Đã hủy' || record.trangThai === 'Đã thanh toán'}
+          >
+            Thanh toán
+          </Button>
         </Space>
       ),
     },
@@ -449,6 +505,38 @@ function DatPhong() {
             </Form.Item>
           </Form>
         </Spin>
+      </Modal>
+      <Modal
+        title="Chi tiết Đặt phòng"
+        open={isDetailModalVisible}
+        onCancel={() => setIsDetailModalVisible(false)}
+        footer={null}
+        width={600}
+      >
+        {chiTietDatPhong && (
+          <div>
+            <Descriptions bordered column={1}>
+              <Descriptions.Item label="Mã đặt phòng">{chiTietDatPhong.maDatPhong}</Descriptions.Item>
+              <Descriptions.Item label="Tên phòng">{chiTietDatPhong.tenPhong}</Descriptions.Item>
+              <Descriptions.Item label="Khách hàng đại diện">{chiTietDatPhong.tenKhachHang}</Descriptions.Item>
+              <Descriptions.Item label="Ngày nhận phòng">{dayjs(chiTietDatPhong.ngayNhanPhong).format('DD/MM/YYYY HH:mm')}</Descriptions.Item>
+              <Descriptions.Item label="Ngày trả phòng">{dayjs(chiTietDatPhong.ngayTraPhong).format('DD/MM/YYYY HH:mm')}</Descriptions.Item>
+              <Descriptions.Item label="Số người ở">{chiTietDatPhong.soNguoiO}</Descriptions.Item>
+              <Descriptions.Item label="Trạng thái">{chiTietDatPhong.trangThai}</Descriptions.Item>
+            </Descriptions>
+            
+            <h4 style={{marginTop: 20}}>Danh sách khách ở</h4>
+            <List
+              bordered
+              dataSource={chiTietDatPhong.danhSachKhachHang || []}
+              renderItem={item => (
+                <List.Item>
+                  {item.hoTen} ({item.soCmnd})
+                </List.Item>
+              )}
+            />
+          </div>
+        )}
       </Modal>
     </div>
   );

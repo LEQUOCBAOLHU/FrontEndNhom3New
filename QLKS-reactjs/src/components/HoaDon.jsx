@@ -11,6 +11,9 @@ import {
   message,
   Select,
   InputNumber,
+  Descriptions,
+  Typography,
+  Divider,
 } from 'antd';
 import { apiFetch } from '../auth';
 import './HoaDon.css';
@@ -20,6 +23,8 @@ function HoaDon() {
   const [loading, setLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingHoaDon, setEditingHoaDon] = useState(null);
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+  const [chiTietHoaDon, setChiTietHoaDon] = useState(null);
   const [search, setSearch] = useState('');
   const [isStatusModalVisible, setIsStatusModalVisible] = useState(false);
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
@@ -72,6 +77,24 @@ function HoaDon() {
   useEffect(() => {
     fetchHoaDons();
   }, [search]);
+
+  const showDetailModal = async (maHoaDon) => {
+    setLoading(true);
+    try {
+      const res = await apiFetch(`http://localhost:5189/api/HoaDon/${maHoaDon}`);
+      const data = await res.json();
+      if(data.data) {
+        setChiTietHoaDon(data.data);
+        setIsDetailModalVisible(true);
+      } else {
+        message.error('Không thể tải chi tiết hóa đơn!');
+      }
+    } catch (error) {
+      message.error('Lỗi khi tải chi tiết hóa đơn!');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDelete = async (maHoaDon) => {
     try {
@@ -250,19 +273,20 @@ function HoaDon() {
     { title: 'Phương thức', dataIndex: 'phuongThucThanhToan', key: 'phuongThucThanhToan' },
     { title: 'Trạng thái', dataIndex: 'trangThai', key: 'trangThai' },
     {
-      title: 'Hành động',
+      title: 'Thao tác',
       key: 'action',
       render: (_, record) => (
         <Space>
+          <Button onClick={() => showDetailModal(record.maHoaDon)}>Chi tiết</Button>
           <Button onClick={() => showEditModal(record)}>Sửa</Button>
-          <Popconfirm title="Bạn chắc chắn xóa?" onConfirm={() => handleDelete(record.maHoaDon)}>
+          <Popconfirm title="Bạn có chắc muốn xóa?" onConfirm={() => handleDelete(record.maHoaDon)}>
             <Button danger>Xóa</Button>
           </Popconfirm>
           <Button onClick={() => handleExportPDF(record.maHoaDon)}>Xuất PDF</Button>
-          <Button onClick={() => handleExportPDFEmail(record.maHoaDon)}>Gửi PDF Email</Button>
-          <Button onClick={() => { setSelectedHoaDon(record); setIsStatusModalVisible(true); }}>Cập nhật trạng thái</Button>
-          <Button onClick={() => { setSelectedHoaDon(record); setIsPaymentModalVisible(true); }}>Cập nhật thanh toán</Button>
+          <Button onClick={() => handleExportPDFEmail(record.maHoaDon)}>Gửi Email</Button>
           <Button onClick={() => showPhuThuModal(record)}>Quản lý phụ thu</Button>
+          <Button onClick={() => { setSelectedHoaDon(record); setIsStatusModalVisible(true); }}>Cập nhật TT</Button>
+          <Button onClick={() => { setSelectedHoaDon(record); setIsPaymentModalVisible(true); }}>Cập nhật PTTT</Button>
         </Space>
       ),
     },
@@ -295,6 +319,55 @@ function HoaDon() {
         <Button onClick={fetchHoaDons}>Làm mới</Button>
       </Space>
       <Table columns={columns} dataSource={hoaDons} rowKey="maHoaDon" loading={loading} />
+
+      <Modal
+        title="Chi tiết hóa đơn"
+        open={isDetailModalVisible}
+        onCancel={() => setIsDetailModalVisible(false)}
+        footer={null}
+        width={800}
+      >
+        {chiTietHoaDon && (
+          <div>
+            <Descriptions title="Thông tin chung" bordered column={2}>
+              <Descriptions.Item label="Mã hóa đơn">{chiTietHoaDon.maHoaDon}</Descriptions.Item>
+              <Descriptions.Item label="Tên khách hàng">{chiTietHoaDon.tenKhachHang}</Descriptions.Item>
+              <Descriptions.Item label="Nhân viên lập">{chiTietHoaDon.tenNhanVien}</Descriptions.Item>
+              <Descriptions.Item label="Ngày lập">{new Date(chiTietHoaDon.ngayLap).toLocaleDateString('vi-VN')}</Descriptions.Item>
+              <Descriptions.Item label="Trạng thái">{chiTietHoaDon.trangThai}</Descriptions.Item>
+              <Descriptions.Item label="Phương thức thanh toán">{chiTietHoaDon.phuongThucThanhToan}</Descriptions.Item>
+            </Descriptions>
+
+            <Divider />
+            
+            <Typography.Title level={5}>Chi tiết dịch vụ</Typography.Title>
+            <Table
+              dataSource={chiTietHoaDon.chiTietDichVu}
+              columns={[
+                { title: 'Tên dịch vụ', dataIndex: 'tenDichVu', key: 'tenDichVu' },
+                { title: 'Số lượng', dataIndex: 'soLuong', key: 'soLuong' },
+                { title: 'Đơn giá', dataIndex: 'donGia', key: 'donGia', render: v => v.toLocaleString('vi-VN') + ' đ' },
+                { title: 'Thành tiền', dataIndex: 'thanhTien', key: 'thanhTien', render: v => v.toLocaleString('vi-VN') + ' đ' },
+              ]}
+              pagination={false}
+              rowKey="tenDichVu"
+            />
+            
+            <Divider />
+
+            <Descriptions bordered column={1}>
+              <Descriptions.Item label="Tiền phòng">{chiTietHoaDon.tongTienPhong?.toLocaleString('vi-VN')} đ</Descriptions.Item>
+              <Descriptions.Item label="Tiền dịch vụ">{chiTietHoaDon.tongTienDichVu?.toLocaleString('vi-VN')} đ</Descriptions.Item>
+              <Descriptions.Item label="Phụ thu">{chiTietHoaDon.tongPhuThu?.toLocaleString('vi-VN')} đ</Descriptions.Item>
+              <Descriptions.Item label="Tổng cộng">
+                <Typography.Text strong style={{fontSize: 18}}>
+                  {chiTietHoaDon.tongTien?.toLocaleString('vi-VN')} đ
+                </Typography.Text>
+              </Descriptions.Item>
+            </Descriptions>
+          </div>
+        )}
+      </Modal>
 
       {/* Invoice Modal */}
       <Modal

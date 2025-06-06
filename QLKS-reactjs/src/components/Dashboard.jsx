@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link, Routes, Route } from 'react-router-dom';
+import { useNavigate, Link, Routes, Route, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BiMenu, BiSun, BiMoon, BiUser, BiBook, BiChart, BiLogOut, BiHome } from 'react-icons/bi';
+import { Dropdown, Space, Avatar } from 'antd';
+import { BiMenu, BiSun, BiMoon, BiUser, BiBook, BiChart, BiLogOut, BiHome, BiKey, BiDownArrow } from 'react-icons/bi';
 import { useTheme } from '../contexts/ThemeContext';
+import { apiFetch } from '../auth';
 import Phong from './Phong';
 import DichVu from './DichVu';
 import KhachHang from './KhachHang';
@@ -19,20 +21,10 @@ import './Dashboard.css';
 
 // Icons import
 import { MdHotel, MdRoomService, MdMeetingRoom, MdAssignment, MdReceipt, MdAttachMoney, MdMiscellaneousServices } from 'react-icons/md';
-import HomeUser from './HomeUser';
-import GioiThieuUser from './GioiThieuUser';
-import PhongUser from './PhongUser';
-import TienIchUser from './TienIchUser';
-import KhuyenMaiUser from './KhuyenMaiUser';
-import DatPhongUser from './DatPhongUser';
-import LienHeUser from './LienHeUser';
-import LoginUser from './LoginUser';
-import RegisterUser from './RegisterUser';
 import TichDiemAdmin from './TichDiemAdmin';
 import LichSuTichDiemAdmin from './LichSuTichDiemAdmin';
 import BaoCao from './BaoCao';
 import ChangePassword from './ChangePassword';
-import ForgotPassword from './ForgotPassword';
 
 const menuItems = [
   { icon: <BiHome size={24} />, label: 'Dashboard', path: '/dashboard' },
@@ -44,7 +36,7 @@ const menuItems = [
   { icon: <BiUser size={24} />, label: 'Tài khoản', path: '/dashboard/account', adminOnly: true },
   { icon: <MdAssignment size={24} />, label: 'Đặt phòng', path: '/dashboard/datphong' },
   { icon: <MdReceipt size={24} />, label: 'Hóa đơn', path: '/dashboard/hoadon' },
-  { icon: <BiChart size={24} />, label: 'Thống kê', path: '/dashboard/thongke', adminOnly: true },
+  { icon: <BiChart size={24} />, label: 'Thống kê', path: '/dashboard/thongke' },
   { icon: <BiBook size={24} />, label: 'QL Tất cả phòng', path: '/dashboard/quanlyphong', adminOnly: true },
   { icon: <MdAttachMoney size={24} />, label: 'Phụ thu', path: '/dashboard/phuthu' },
   { icon: <MdMiscellaneousServices size={24} />, label: 'Sử dụng dịch vụ', path: '/dashboard/sudungdichvu' },
@@ -70,39 +62,132 @@ const StatCard = ({ icon, label, value, type }) => (
 const Dashboard = () => {
   const [isOpen, setIsOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [dashboardStats, setDashboardStats] = useState({
+    totalRevenue: 0,
+    totalBookings: 0,
+    availableRooms: 0,
+    occupiedRooms: 0,
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
   const { isDarkMode, toggleTheme } = useTheme();
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  console.log("Thông tin user từ localStorage:", user);
   const role = user.vaiTro || user.role || '';
 
   // Lọc menu items dựa trên vai trò
   const filteredMenuItems = menuItems.filter(item => {
-    if (role === 'QuanLy') return true;
+    // Chuyển vai trò về chữ thường để so sánh không phân biệt hoa/thường
+    if (role.toLowerCase() === 'quanly') return true;
     return !item.adminOnly;
   });
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
+
+    const fetchDashboardStats = async () => {
+      setLoadingStats(true);
+      try {
+        let totalRevenue = 0;
+        
+        // Revenue is only available for 'QuanLy' role
+        console.log("Kiểm tra vai trò:", role); // Log 1: Check role
+        if (role.toLowerCase() === 'quanly') {
+          const startDate = '2000-01-01';
+          const endDate = new Date().toISOString().split('T')[0]; // Today's date
+          const revenueResponse = await apiFetch(`http://localhost:5189/api/ThongKe/khoang-thoi-gian?tuNgay=${startDate}&denNgay=${endDate}`);
+          
+          if (revenueResponse.ok) {
+            const revenueData = await revenueResponse.json();
+            console.log("Dữ liệu doanh thu từ API:", revenueData); // Log 2: Check API response
+            totalRevenue = revenueData.data?.tongDoanhThu || 0;
+            console.log("Doanh thu đã xử lý:", totalRevenue); // Log 3: Check processed value
+          } else {
+            console.warn(`Không thể tải doanh thu, status: ${revenueResponse.status}`);
+          }
+        }
+
+        // 1. Get total bookings from HoaDon endpoint (accessible by NhanVien)
+        const hoaDonResponse = await apiFetch('http://localhost:5189/api/hoadon?pageSize=1');
+        const hoaDonData = await hoaDonResponse.json();
+        const totalBookings = hoaDonData.data?.totalItems || 0;
+        
+        // 2. Get room status statistics (accessible by NhanVien)
+        const roomStatusResponse = await apiFetch('http://localhost:5189/api/Phong/thong-ke-trang-thai');
+        const roomStatusData = await roomStatusResponse.json();
+        const availableRooms = roomStatusData.data?.['Trống'] || 0;
+        const occupiedRooms = roomStatusData.data?.['Đang sử dụng'] || 0;
+
+        setDashboardStats({
+            totalRevenue,
+            totalBookings,
+            availableRooms,
+            occupiedRooms,
+        });
+
+      } catch (error) {
+        console.error("Lỗi khi tải thống kê cho dashboard:", error);
+        // Set default values on error to avoid crash
+        setDashboardStats({
+            totalRevenue: 0,
+            totalBookings: 0,
+            availableRooms: 0,
+            occupiedRooms: 0,
+        });
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
+    fetchDashboardStats();
+    
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const toggleSidebar = () => setIsOpen(!isOpen);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await apiFetch('http://localhost:5189/api/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error("Lỗi khi đăng xuất:", error);
+    } finally {
+      // Luôn xóa thông tin local dù API có lỗi hay không
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     navigate('/login');
+    }
+  };
+
+  const formatCurrency = (value) => {
+    if (!value) return '0 VNĐ';
+    return `${Math.round(value).toLocaleString('vi-VN')} VNĐ`;
   };
 
   const stats = [
-    { icon: <MdHotel size={32} />, label: 'Phòng trống', value: '15', type: 'primary' },
-    { icon: <MdRoomService size={32} />, label: 'Đang sử dụng', value: '8', type: 'success' },
-    { icon: <BiUser size={32} />, label: 'Khách hàng', value: '24', type: 'warning' },
-    { icon: <BiChart size={32} />, label: 'Doanh thu', value: '120M', type: 'info' },
+    { icon: <MdHotel size={32} />, label: 'Phòng trống', value: loadingStats ? '...' : dashboardStats.availableRooms, type: 'primary' },
+    { icon: <MdRoomService size={32} />, label: 'Đang sử dụng', value: loadingStats ? '...' : dashboardStats.occupiedRooms, type: 'success' },
+    { icon: <MdAssignment size={32} />, label: 'Tổng đặt phòng', value: loadingStats ? '...' : dashboardStats.totalBookings, type: 'warning' },
+    { icon: <BiChart size={32} />, label: 'Doanh thu', value: loadingStats ? '...' : formatCurrency(dashboardStats.totalRevenue), type: 'info' },
   ];
+
+  const userMenuItems = (
+    <div className="user-dropdown-menu">
+      <Link to="/dashboard/change-password" className="user-dropdown-item">
+        <BiKey /> Đổi mật khẩu
+      </Link>
+      <div onClick={handleLogout} className="user-dropdown-item">
+        <BiLogOut /> Đăng xuất
+      </div>
+    </div>
+  );
+  
+  // Lấy tên trang hiện tại từ path
+  const currentPage = menuItems.find(item => item.path === location.pathname)?.label || 'Dashboard';
 
   return (
     <div className="dashboard-container">
@@ -157,34 +242,26 @@ const Dashboard = () => {
               </motion.span>
             </button>
           </motion.div>
-
-          {/* Logout Button */}
-          <motion.div
-            className="menu-item logout-item"
-            whileHover={{ scale: 1.02, x: 5 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <button onClick={handleLogout} className="menu-link logout-button">
-              <BiLogOut size={24} />
-              <motion.span
-                animate={{ opacity: isOpen ? 1 : 0 }}
-                className="menu-label"
-              >
-                Đăng xuất
-              </motion.span>
-            </button>
-          </motion.div>
         </div>
       </motion.div>
 
       {/* Main Content */}
-      <main className={`main-content ${isOpen ? 'sidebar-open' : ''}`}
-        style={{maxWidth:'100vw',overflowX:'auto'}}>
+      <main className={`main-content ${isOpen ? 'sidebar-open' : ''}`}>
         <div className="top-bar">
           <button className="mobile-menu" onClick={toggleSidebar}>
             <BiMenu size={24} />
           </button>
-          <div className="page-title">Dashboard</div>
+          <div className="page-title">{currentPage}</div>
+          
+          <Dropdown overlay={userMenuItems} trigger={['click']}>
+            <a onClick={e => e.preventDefault()} className="user-menu-trigger">
+              <Space>
+                <Avatar icon={<BiUser />} />
+                <span>{user.hoTen || 'User'}</span>
+                <BiDownArrow />
+              </Space>
+            </a>
+          </Dropdown>
         </div>
 
         <Routes>
@@ -253,20 +330,10 @@ const Dashboard = () => {
           <Route path="quanlyphong" element={<QuanLyPhong />} />
           <Route path="phuthu" element={<PhuThu />} />
           <Route path="sudungdichvu" element={<SuDungDichVu />} />
-          <Route path="home-user" element={<HomeUser />} />
-          <Route path="gioi-thieu-user" element={<GioiThieuUser />} />
-          <Route path="phong-user" element={<PhongUser />} />
-          <Route path="tien-ich-user" element={<TienIchUser />} />
-          <Route path="khuyen-mai-user" element={<KhuyenMaiUser />} />
-          <Route path="dat-phong-user" element={<DatPhongUser />} />
-          <Route path="lien-he-user" element={<LienHeUser />} />
-          <Route path="login-user" element={<LoginUser />} />
-          <Route path="register-user" element={<RegisterUser />} />
           <Route path="tich-diem-admin" element={<TichDiemAdmin />} />
           <Route path="lich-su-tich-diem-admin" element={<LichSuTichDiemAdmin />} />
           <Route path="bao-cao" element={<BaoCao />} />
           <Route path="change-password" element={<ChangePassword />} />
-          <Route path="forgot-password" element={<ForgotPassword />} />
         </Routes>
       </main>
 

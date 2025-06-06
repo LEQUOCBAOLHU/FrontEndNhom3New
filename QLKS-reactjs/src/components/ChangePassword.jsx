@@ -1,40 +1,99 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, message } from 'antd';
+import { Form, Input, Button, Card, message, Typography } from 'antd';
+import { LockOutlined } from '@ant-design/icons';
 import { apiFetch } from '../auth';
+import { useTheme } from '../contexts/ThemeContext';
+import '../styles/ChangePassword.css';
+
+const { Title } = Typography;
 
 const ChangePassword = () => {
   const [loading, setLoading] = useState(false);
+    const { isDarkMode } = useTheme();
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const onFinish = async (values) => {
     setLoading(true);
-    try {
-      const res = await apiFetch('http://localhost:5189/api/Auth/password', {
+        if (values.newPassword !== values.confirmPassword) {
+            message.error("Mật khẩu mới và mật khẩu xác nhận không khớp!");
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const payload = {
+                email: user.Email,
+                oldPassword: values.oldPassword,
+                newPassword: values.newPassword,
+            };
+            
+            const res = await apiFetch('http://localhost:5189/api/auth/password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values)
+                body: JSON.stringify(payload)
       });
+
+            const data = await res.json();
+
       if (res.ok) {
         message.success('Đổi mật khẩu thành công!');
       } else {
-        const data = await res.json();
-        message.error(data.Message || 'Đổi mật khẩu thất bại!');
+                message.error(data.message || 'Đã có lỗi xảy ra.');
       }
-    } catch (e) {
-      message.error('Lỗi hệ thống!');
+        } catch (error) {
+            message.error('Lỗi kết nối đến máy chủ.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ maxWidth: 400, margin: '40px auto', padding: 24, background: '#fff', borderRadius: 8 }}>
-      <h2>Đổi mật khẩu</h2>
-      <Form layout="vertical" onFinish={onFinish}>
-        <Form.Item label="Email" name="email" rules={[{ required: true, type: 'email', message: 'Nhập email hợp lệ!' }]}> <Input /> </Form.Item>
-        <Form.Item label="Mật khẩu cũ" name="oldPassword" rules={[{ required: true, message: 'Nhập mật khẩu cũ!' }]}> <Input.Password /> </Form.Item>
-        <Form.Item label="Mật khẩu mới" name="newPassword" rules={[{ required: true, message: 'Nhập mật khẩu mới!' }]}> <Input.Password autoComplete="new-password" /> </Form.Item>
-        <Form.Item> <Button type="primary" htmlType="submit" loading={loading}>Đổi mật khẩu</Button> </Form.Item>
+        <div className={`change-password-container ${isDarkMode ? 'dark' : ''}`}>
+            <Card className="change-password-card">
+                <Title level={2} className="change-password-title">Đổi mật khẩu</Title>
+                <Form
+                    name="change_password"
+                    onFinish={onFinish}
+                    autoComplete="off"
+                >
+                    <Form.Item
+                        name="oldPassword"
+                        rules={[{ required: true, message: 'Vui lòng nhập mật khẩu cũ!' }]}
+                    >
+                        <Input.Password prefix={<LockOutlined />} placeholder="Mật khẩu cũ" />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="newPassword"
+                        rules={[{ required: true, message: 'Vui lòng nhập mật khẩu mới!' }]}
+                    >
+                        <Input.Password prefix={<LockOutlined />} placeholder="Mật khẩu mới" />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="confirmPassword"
+                        dependencies={['newPassword']}
+                        rules={[
+                            { required: true, message: 'Vui lòng xác nhận mật khẩu mới!' },
+                            ({ getFieldValue }) => ({
+                                validator(_, value) {
+                                    if (!value || getFieldValue('newPassword') === value) {
+                                        return Promise.resolve();
+                                    }
+                                    return Promise.reject(new Error('Mật khẩu xác nhận không khớp!'));
+                                },
+                            }),
+                        ]}
+                    >
+                        <Input.Password prefix={<LockOutlined />} placeholder="Xác nhận mật khẩu mới" />
+                    </Form.Item>
+
+                    <Form.Item>
+                        <Button type="primary" htmlType="submit" loading={loading} block>
+                            Cập nhật mật khẩu
+                        </Button>
+                    </Form.Item>
       </Form>
+            </Card>
     </div>
   );
 };

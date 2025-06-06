@@ -1,326 +1,229 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Paper,
   Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
+  Button,
+  Modal,
+  Form,
+  InputNumber,
+  Select,
+  Space,
+  Popconfirm,
+  message,
   Typography,
-  Snackbar,
-  Alert,
-  CircularProgress,
-  TablePagination,
-  MenuItem,
-} from '@mui/material';
-import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
-import { phuThuService } from '../services/phuThuService';
+} from 'antd';
+import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { apiFetch } from '../auth';
 import './PhuThu.css';
 
+const { Title } = Typography;
+const { Option } = Select;
+
 const PhuThu = () => {
-  const [phuThuList, setPhuThuList] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [selectedPhuThu, setSelectedPhuThu] = useState(null);
+  const [phuThus, setPhuThus] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success',
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingPhuThu, setEditingPhuThu] = useState(null);
+  const [loaiPhongs, setLoaiPhongs] = useState([]);
+  const [form] = Form.useForm();
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
   });
-  const [formData, setFormData] = useState({
-    maLoaiPhong: '',
-    giaPhuThuTheoNgay: '',
-    giaPhuThuTheoGio: '',
-  });
-  const [errors, setErrors] = useState({});
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+
+  const fetchLoaiPhongs = async () => {
+    try {
+      const res = await apiFetch('http://localhost:5189/api/LoaiPhong?pageNumber=1&pageSize=100');
+      const data = await res.json();
+      if (data && data.data) {
+        setLoaiPhongs(data.data.loaiPhongs || []);
+      }
+    } catch (error) {
+      message.error('Lỗi khi tải danh sách loại phòng.');
+    }
+  };
+  
+  const fetchPhuThus = async (page = 1, pageSize = 10) => {
+    setLoading(true);
+    try {
+      const res = await apiFetch(`http://localhost:5189/api/PhuThu?pageNumber=${page}&pageSize=${pageSize}`);
+      const data = await res.json();
+      if (data && data.data) {
+        setPhuThus(data.data.phuThus || []);
+        setPagination({
+          current: data.data.currentPage,
+          pageSize: data.data.pageSize,
+          total: data.data.totalItems,
+        });
+      } else {
+        setPhuThus([]);
+        message.error('Không thể tải dữ liệu phụ thu.');
+      }
+    } catch (error) {
+      message.error('Lỗi khi tải danh sách phụ thu.');
+      setPhuThus([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetchPhuThu();
-  }, [page, rowsPerPage]);
+    fetchPhuThus(pagination.current, pagination.pageSize);
+    fetchLoaiPhongs();
+  }, []);
 
-  const fetchPhuThu = async () => {
-    setLoading(true);
-    try {
-      const response = await phuThuService.getAll(page + 1, rowsPerPage);
-      setPhuThuList(response.data.phuThus || []);
-      setTotalItems(response.data.totalItems || 0);
-      setTotalPages(response.data.totalPages || 0);
-    } catch (error) {
-      showSnackbar('Lỗi khi tải danh sách phụ thu', 'error');
-    } finally {
-      setLoading(false);
-    }
+  const handleTableChange = (newPagination) => {
+    fetchPhuThus(newPagination.current, newPagination.pageSize);
   };
 
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.maLoaiPhong) {
-      newErrors.maLoaiPhong = 'Loại phòng không được để trống';
-    }
-    if (!formData.giaPhuThuTheoNgay && !formData.giaPhuThuTheoGio) {
-      newErrors.giaPhuThuTheoNgay = 'Ít nhất một loại giá phụ thu phải được nhập';
-      newErrors.giaPhuThuTheoGio = 'Ít nhất một loại giá phụ thu phải được nhập';
-    }
-    if (formData.giaPhuThuTheoNgay && formData.giaPhuThuTheoNgay < 0) {
-      newErrors.giaPhuThuTheoNgay = 'Giá phụ thu theo ngày không được âm';
-    }
-    if (formData.giaPhuThuTheoGio && formData.giaPhuThuTheoGio < 0) {
-      newErrors.giaPhuThuTheoGio = 'Giá phụ thu theo giờ không được âm';
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleOpen = (phuThu = null) => {
-    if (phuThu) {
-      setSelectedPhuThu(phuThu);
-      setFormData({
-        maLoaiPhong: phuThu.maLoaiPhong,
-        giaPhuThuTheoNgay: phuThu.giaPhuThuTheoNgay || '',
-        giaPhuThuTheoGio: phuThu.giaPhuThuTheoGio || '',
-      });
+  const showModal = (record = null) => {
+    setEditingPhuThu(record);
+    if (record) {
+      form.setFieldsValue(record);
     } else {
-      setSelectedPhuThu(null);
-      setFormData({
-        maLoaiPhong: '',
-        giaPhuThuTheoNgay: '',
-        giaPhuThuTheoGio: '',
-      });
+      form.resetFields();
     }
-    setErrors({});
-    setOpen(true);
+    setIsModalVisible(true);
   };
 
-  const handleClose = () => {
-    setOpen(false);
-    setSelectedPhuThu(null);
-    setFormData({
-      maLoaiPhong: '',
-      giaPhuThuTheoNgay: '',
-      giaPhuThuTheoGio: '',
-    });
-    setErrors({});
+  const handleCancel = () => {
+    setIsModalVisible(false);
+    setEditingPhuThu(null);
+    form.resetFields();
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-
-    setLoading(true);
+  const handleOk = async () => {
     try {
-      if (selectedPhuThu) {
-        await phuThuService.update(selectedPhuThu.maPhuThu, formData);
-        showSnackbar('Cập nhật phụ thu thành công', 'success');
-      } else {
-        await phuThuService.create(formData);
-        showSnackbar('Thêm phụ thu thành công', 'success');
+      const values = await form.validateFields();
+      let url = 'http://localhost:5189/api/PhuThu';
+      let method = 'POST';
+
+      if (editingPhuThu) {
+        url = `http://localhost:5189/api/PhuThu/${editingPhuThu.maPhuThu}`;
+        method = 'PUT';
       }
-      fetchPhuThu();
-      handleClose();
+
+      const response = await apiFetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+
+      if (response.ok) {
+        message.success(editingPhuThu ? 'Cập nhật thành công!' : 'Thêm mới thành công!');
+        handleCancel();
+        fetchPhuThus(pagination.current, pagination.pageSize);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        message.error(errorData.message || 'Thao tác thất bại.');
+      }
     } catch (error) {
-      showSnackbar('Lỗi khi lưu phụ thu', 'error');
-    } finally {
-      setLoading(false);
+        message.error('Đã xảy ra lỗi. Vui lòng thử lại.');
     }
   };
 
   const handleDelete = async (maPhuThu) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa phụ thu này?')) {
-      setLoading(true);
-      try {
-        await phuThuService.delete(maPhuThu);
-        showSnackbar('Xóa phụ thu thành công', 'success');
-        fetchPhuThu();
-      } catch (error) {
-        showSnackbar('Lỗi khi xóa phụ thu', 'error');
-      } finally {
-        setLoading(false);
+    try {
+      const response = await apiFetch(`http://localhost:5189/api/PhuThu/${maPhuThu}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        message.success('Xóa phụ thu thành công!');
+        fetchPhuThus(pagination.current, pagination.pageSize);
+      } else {
+        message.error('Xóa thất bại!');
       }
+    } catch (error) {
+      message.error('Đã xảy ra lỗi khi xóa.');
     }
   };
 
-  const showSnackbar = (message, severity) => {
-    setSnackbar({
-      open: true,
-      message,
-      severity,
-    });
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
+  const columns = [
+    { title: 'Mã Phụ Thu', dataIndex: 'maPhuThu', key: 'maPhuThu' },
+    { title: 'Loại Phòng', dataIndex: 'tenLoaiPhong', key: 'tenLoaiPhong' },
+    {
+      title: 'Giá Theo Ngày',
+      dataIndex: 'giaPhuThuTheoNgay',
+      key: 'giaPhuThuTheoNgay',
+      render: (gia) => `${gia?.toLocaleString('vi-VN')} VNĐ`,
+    },
+    {
+      title: 'Giá Theo Giờ',
+      dataIndex: 'giaPhuThuTheoGio',
+      key: 'giaPhuThuTheoGio',
+      render: (gia) => `${gia?.toLocaleString('vi-VN')} VNĐ`,
+    },
+    {
+      title: 'Thao Tác',
+      key: 'action',
+      render: (_, record) => (
+        <Space size="middle">
+          <Button icon={<EditOutlined />} onClick={() => showModal(record)}>
+            Sửa
+          </Button>
+          <Popconfirm
+            title="Bạn có chắc chắn muốn xóa?"
+            onConfirm={() => handleDelete(record.maPhuThu)}
+            okText="Xóa"
+            cancelText="Hủy"
+          >
+            <Button icon={<DeleteOutlined />} danger>
+              Xóa
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          Quản lý Phụ thu
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpen()}
-        >
-          Thêm phụ thu mới
-        </Button>
-      </Box>
-
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Mã phụ thu</TableCell>
-                <TableCell>Loại phòng</TableCell>
-                <TableCell>Giá phụ thu theo ngày</TableCell>
-                <TableCell>Giá phụ thu theo giờ</TableCell>
-                <TableCell>Thao tác</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {phuThuList.map((phuThu) => (
-                <TableRow key={phuThu.maPhuThu}>
-                  <TableCell>{phuThu.maPhuThu}</TableCell>
-                  <TableCell>{phuThu.tenLoaiPhong}</TableCell>
-                  <TableCell>
-                    {phuThu.giaPhuThuTheoNgay?.toLocaleString('vi-VN')} VNĐ
-                  </TableCell>
-                  <TableCell>
-                    {phuThu.giaPhuThuTheoGio?.toLocaleString('vi-VN')} VNĐ
-                  </TableCell>
-                  <TableCell>
-                    <IconButton onClick={() => handleOpen(phuThu)} color="primary">
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton onClick={() => handleDelete(phuThu.maPhuThu)} color="error">
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <TablePagination
-            component="div"
-            count={totalItems}
-            page={page}
-            onPageChange={handleChangePage}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            rowsPerPageOptions={[5, 10, 25, 50]}
-            labelRowsPerPage="Số hàng mỗi trang"
-            labelDisplayedRows={({ from, to, count }) => `${from}-${to} của ${count}`}
-          />
-        </TableContainer>
-      )}
-
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {selectedPhuThu ? 'Chỉnh sửa phụ thu' : 'Thêm phụ thu mới'}
-        </DialogTitle>
-        <DialogContent>
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
-            <TextField
-              fullWidth
-              label="Mã loại phòng"
-              type="number"
-              value={formData.maLoaiPhong}
-              onChange={(e) => setFormData({ ...formData, maLoaiPhong: e.target.value })}
-              margin="normal"
-              required
-              error={!!errors.maLoaiPhong}
-              helperText={errors.maLoaiPhong}
-            />
-            <TextField
-              fullWidth
-              label="Giá phụ thu theo ngày"
-              type="number"
-              value={formData.giaPhuThuTheoNgay}
-              onChange={(e) => setFormData({ ...formData, giaPhuThuTheoNgay: e.target.value })}
-              margin="normal"
-              error={!!errors.giaPhuThuTheoNgay}
-              helperText={errors.giaPhuThuTheoNgay}
-              InputProps={{
-                endAdornment: <span>VNĐ</span>,
-              }}
-            />
-            <TextField
-              fullWidth
-              label="Giá phụ thu theo giờ"
-              type="number"
-              value={formData.giaPhuThuTheoGio}
-              onChange={(e) => setFormData({ ...formData, giaPhuThuTheoGio: e.target.value })}
-              margin="normal"
-              error={!!errors.giaPhuThuTheoGio}
-              helperText={errors.giaPhuThuTheoGio}
-              InputProps={{
-                endAdornment: <span>VNĐ</span>,
-              }}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Hủy</Button>
-          <Button
-            onClick={handleSubmit}
-            variant="contained"
-            color="primary"
-            disabled={loading}
-          >
-            {loading ? (
-              <CircularProgress size={24} />
-            ) : selectedPhuThu ? (
-              'Cập nhật'
-            ) : (
-              'Thêm mới'
-            )}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+    <div style={{ padding: 24 }}>
+      <Title level={2}>Quản lý Phụ Thu</Title>
+      <Table
+        columns={columns}
+        dataSource={phuThus}
+        rowKey="maPhuThu"
+        loading={loading}
+        pagination={pagination}
+        onChange={handleTableChange}
+        bordered
+      />
+      <Modal
+        title={editingPhuThu ? 'Sửa Phụ Thu' : 'Thêm Phụ Thu'}
+        open={isModalVisible}
+        onOk={handleOk}
+        onCancel={handleCancel}
+        destroyOnClose
       >
-        <Alert
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+        <Form form={form} layout="vertical" name="phuThuForm">
+          <Form.Item
+            name="maLoaiPhong"
+            label="Loại Phòng"
+            rules={[{ required: true, message: 'Vui lòng chọn loại phòng!' }]}
+          >
+            <Select placeholder="Chọn loại phòng" disabled={!!editingPhuThu}>
+              {loaiPhongs.map(lp => (
+                <Option key={lp.maLoaiPhong} value={lp.maLoaiPhong}>
+                  {lp.tenLoaiPhong}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="giaPhuThuTheoNgay"
+            label="Giá Phụ Thu Theo Ngày"
+          >
+            <InputNumber style={{ width: '100%' }} min={0} formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value.replace(/\$\s?|(,*)/g, '')} />
+          </Form.Item>
+          <Form.Item
+            name="giaPhuThuTheoGio"
+            label="Giá Phụ Thu Theo Giờ"
+          >
+            <InputNumber style={{ width: '100%' }} min={0} formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value.replace(/\$\s?|(,*)/g, '')} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
   );
 };
 

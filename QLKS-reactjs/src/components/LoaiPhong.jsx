@@ -1,340 +1,223 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Paper,
   Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
+  Button,
+  Modal,
+  Form,
+  Input,
+  InputNumber,
+  Space,
+  Popconfirm,
+  message,
   Typography,
-  Snackbar,
-  Alert,
-  CircularProgress,
-  TablePagination,
-  InputAdornment,
-} from '@mui/material';
-import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
-import { loaiPhongService } from '../services/loaiPhongService';
+} from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { apiFetch } from '../auth';
 import './LoaiPhong.css';
 
+const { Title } = Typography;
+const { TextArea } = Input;
+
 const LoaiPhong = () => {
-  const [loaiPhongList, setLoaiPhongList] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [selectedLoaiPhong, setSelectedLoaiPhong] = useState(null);
+  const [loaiPhongs, setLoaiPhongs] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success',
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingLoaiPhong, setEditingLoaiPhong] = useState(null);
+  const [form] = Form.useForm();
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
   });
-  const [formData, setFormData] = useState({
-    tenLoaiPhong: '',
-    giaCoBan: '',
-    soNguoiToiDa: '',
-    moTa: '',
-  });
-  const [errors, setErrors] = useState({});
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+
+  const fetchLoaiPhongs = async (page = 1, pageSize = 10) => {
+    setLoading(true);
+    try {
+      const res = await apiFetch(`http://localhost:5189/api/LoaiPhong?pageNumber=${page}&pageSize=${pageSize}`);
+      const data = await res.json();
+      if (data && data.data) {
+        setLoaiPhongs(data.data.loaiPhongs || []);
+        setPagination({
+          current: data.data.currentPage,
+          pageSize: data.data.pageSize,
+          total: data.data.totalItems,
+        });
+      } else {
+        setLoaiPhongs([]);
+        message.error('Không thể tải dữ liệu loại phòng.');
+      }
+    } catch (error) {
+      message.error('Lỗi khi tải danh sách loại phòng.');
+      setLoaiPhongs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetchLoaiPhong();
-  }, [page, rowsPerPage]);
+    fetchLoaiPhongs(pagination.current, pagination.pageSize);
+  }, []);
 
-  const fetchLoaiPhong = async () => {
-    setLoading(true);
-    try {
-      const response = await loaiPhongService.getAll(page + 1, rowsPerPage);
-      setLoaiPhongList(response.data?.loaiPhongs || []);
-      setTotalItems(response.data?.totalItems || 0);
-      setTotalPages(response.data?.totalPages || 0);
-    } catch (error) {
-      showSnackbar('Lỗi khi tải danh sách loại phòng', 'error');
-    } finally {
-      setLoading(false);
-    }
+  const handleTableChange = (newPagination) => {
+    fetchLoaiPhongs(newPagination.current, newPagination.pageSize);
   };
 
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.tenLoaiPhong) {
-      newErrors.tenLoaiPhong = 'Tên loại phòng không được để trống';
-    }
-    if (!formData.giaCoBan) {
-      newErrors.giaCoBan = 'Giá cơ bản không được để trống';
-    }
-    if (formData.giaCoBan && formData.giaCoBan < 0) {
-      newErrors.giaCoBan = 'Giá cơ bản không được âm';
-    }
-    if (!formData.soNguoiToiDa) {
-      newErrors.soNguoiToiDa = 'Số người tối đa không được để trống';
-    }
-    if (formData.soNguoiToiDa && formData.soNguoiToiDa < 1) {
-      newErrors.soNguoiToiDa = 'Số người tối đa phải lớn hơn 0';
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleOpen = (loaiPhong = null) => {
-    if (loaiPhong) {
-      setSelectedLoaiPhong(loaiPhong);
-      setFormData({
-        tenLoaiPhong: loaiPhong.tenLoaiPhong,
-        giaCoBan: loaiPhong.giaCoBan || '',
-        soNguoiToiDa: loaiPhong.soNguoiToiDa || '',
-        moTa: loaiPhong.moTa || '',
-      });
+  const showModal = (record = null) => {
+    setEditingLoaiPhong(record);
+    if (record) {
+      form.setFieldsValue(record);
     } else {
-      setSelectedLoaiPhong(null);
-      setFormData({
-        tenLoaiPhong: '',
-        giaCoBan: '',
-        soNguoiToiDa: '',
-        moTa: '',
-      });
+      form.resetFields();
     }
-    setErrors({});
-    setOpen(true);
+    setIsModalVisible(true);
   };
 
-  const handleClose = () => {
-    setOpen(false);
-    setSelectedLoaiPhong(null);
-    setFormData({
-      tenLoaiPhong: '',
-      giaCoBan: '',
-      soNguoiToiDa: '',
-      moTa: '',
-    });
-    setErrors({});
+  const handleCancel = () => {
+    setIsModalVisible(false);
+    setEditingLoaiPhong(null);
+    form.resetFields();
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-
-    setLoading(true);
+  const handleOk = async () => {
     try {
-      if (selectedLoaiPhong) {
-        await loaiPhongService.update(selectedLoaiPhong.maLoaiPhong, formData);
-        showSnackbar('Cập nhật loại phòng thành công', 'success');
-      } else {
-        await loaiPhongService.create(formData);
-        showSnackbar('Thêm loại phòng thành công', 'success');
+      const values = await form.validateFields();
+      let url = 'http://localhost:5189/api/LoaiPhong';
+      let method = 'POST';
+
+      if (editingLoaiPhong) {
+        url = `http://localhost:5189/api/LoaiPhong/${editingLoaiPhong.maLoaiPhong}`;
+        method = 'PUT';
       }
-      fetchLoaiPhong();
-      handleClose();
+
+      const response = await apiFetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+
+      if (response.ok) {
+        message.success(editingLoaiPhong ? 'Cập nhật thành công!' : 'Thêm mới thành công!');
+        handleCancel();
+        fetchLoaiPhongs(pagination.current, pagination.pageSize);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        message.error(errorData.message || 'Thao tác thất bại.');
+      }
     } catch (error) {
-      showSnackbar('Lỗi khi lưu loại phòng', 'error');
-    } finally {
-      setLoading(false);
+      if (error.errorFields) {
+        console.log('Validation failed:', error);
+      } else {
+        message.error('Đã xảy ra lỗi.');
+      }
     }
   };
 
   const handleDelete = async (maLoaiPhong) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa loại phòng này?')) {
-      setLoading(true);
-      try {
-        await loaiPhongService.delete(maLoaiPhong);
-        showSnackbar('Xóa loại phòng thành công', 'success');
-        fetchLoaiPhong();
-      } catch (error) {
-        showSnackbar('Lỗi khi xóa loại phòng', 'error');
-      } finally {
-        setLoading(false);
+    try {
+      const response = await apiFetch(`http://localhost:5189/api/LoaiPhong/${maLoaiPhong}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        message.success('Xóa loại phòng thành công!');
+        fetchLoaiPhongs(pagination.current, pagination.pageSize);
+      } else {
+        message.error('Xóa thất bại! Có thể loại phòng này đang được sử dụng.');
       }
+    } catch (error) {
+      message.error('Đã xảy ra lỗi khi xóa.');
     }
   };
 
-  const showSnackbar = (message, severity) => {
-    setSnackbar({
-      open: true,
-      message,
-      severity,
-    });
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
+  const columns = [
+    { title: 'Mã', dataIndex: 'maLoaiPhong', key: 'maLoaiPhong', sorter: (a, b) => a.maLoaiPhong - b.maLoaiPhong },
+    { title: 'Tên Loại Phòng', dataIndex: 'tenLoaiPhong', key: 'tenLoaiPhong', sorter: (a, b) => a.tenLoaiPhong.localeCompare(b.tenLoaiPhong) },
+    {
+      title: 'Giá Cơ Bản',
+      dataIndex: 'giaCoBan',
+      key: 'giaCoBan',
+      render: (gia) => `${gia?.toLocaleString('vi-VN')} VNĐ`,
+      sorter: (a, b) => a.giaCoBan - b.giaCoBan,
+    },
+    { title: 'Số Người Tối Đa', dataIndex: 'soNguoiToiDa', key: 'soNguoiToiDa', sorter: (a, b) => a.soNguoiToiDa - b.soNguoiToiDa },
+    { title: 'Mô Tả', dataIndex: 'moTa', key: 'moTa', ellipsis: true },
+    {
+      title: 'Thao Tác',
+      key: 'action',
+      render: (_, record) => (
+        <Space size="middle">
+          <Button icon={<EditOutlined />} onClick={() => showModal(record)}>
+            Sửa
+          </Button>
+          <Popconfirm
+            title="Bạn có chắc chắn muốn xóa?"
+            onConfirm={() => handleDelete(record.maLoaiPhong)}
+            okText="Xóa"
+            cancelText="Hủy"
+          >
+            <Button icon={<DeleteOutlined />} danger>
+              Xóa
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          Quản lý Loại Phòng
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpen()}
-        >
-          Thêm loại phòng mới
-        </Button>
-      </Box>
-
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Mã loại phòng</TableCell>
-                <TableCell>Tên loại phòng</TableCell>
-                <TableCell>Giá cơ bản</TableCell>
-                <TableCell>Số người tối đa</TableCell>
-                <TableCell>Mô tả</TableCell>
-                <TableCell>Thao tác</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loaiPhongList.map((loaiPhong) => (
-                <TableRow key={loaiPhong.maLoaiPhong}>
-                  <TableCell>{loaiPhong.maLoaiPhong}</TableCell>
-                  <TableCell>{loaiPhong.tenLoaiPhong}</TableCell>
-                  <TableCell>{loaiPhong.giaCoBan?.toLocaleString('vi-VN')} VNĐ</TableCell>
-                  <TableCell>{loaiPhong.soNguoiToiDa}</TableCell>
-                  <TableCell>{loaiPhong.moTa}</TableCell>
-                  <TableCell>
-                    <IconButton onClick={() => handleOpen(loaiPhong)} color="primary">
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton onClick={() => handleDelete(loaiPhong.maLoaiPhong)} color="error">
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <TablePagination
-            component="div"
-            count={totalItems}
-            page={page}
-            onPageChange={handleChangePage}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            rowsPerPageOptions={[5, 10, 25, 50]}
-            labelRowsPerPage="Số hàng mỗi trang"
-            labelDisplayedRows={({ from, to, count }) => `${from}-${to} của ${count}`}
-          />
-        </TableContainer>
-      )}
-
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {selectedLoaiPhong ? 'Chỉnh sửa loại phòng' : 'Thêm loại phòng mới'}
-        </DialogTitle>
-        <DialogContent>
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
-            <TextField
-              fullWidth
-              label="Tên loại phòng"
-              value={formData.tenLoaiPhong}
-              onChange={(e) => setFormData({ ...formData, tenLoaiPhong: e.target.value })}
-              margin="normal"
-              required
-              error={!!errors.tenLoaiPhong}
-              helperText={errors.tenLoaiPhong}
-            />
-            <TextField
-              fullWidth
-              label="Giá cơ bản"
-              type="number"
-              value={formData.giaCoBan}
-              onChange={(e) => setFormData({ ...formData, giaCoBan: e.target.value })}
-              margin="normal"
-              required
-              error={!!errors.giaCoBan}
-              helperText={errors.giaCoBan}
-              InputProps={{
-                endAdornment: <InputAdornment position="end">VNĐ</InputAdornment>,
-              }}
-            />
-            <TextField
-              fullWidth
-              label="Số người tối đa"
-              type="number"
-              value={formData.soNguoiToiDa}
-              onChange={(e) => setFormData({ ...formData, soNguoiToiDa: e.target.value })}
-              margin="normal"
-              required
-              error={!!errors.soNguoiToiDa}
-              helperText={errors.soNguoiToiDa}
-              InputProps={{
-                inputProps: { min: 1 }
-              }}
-            />
-            <TextField
-              fullWidth
-              label="Mô tả"
-              value={formData.moTa}
-              onChange={(e) => setFormData({ ...formData, moTa: e.target.value })}
-              margin="normal"
-              multiline
-              rows={3}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Hủy</Button>
-          <Button
-            onClick={handleSubmit}
-            variant="contained"
-            color="primary"
-            disabled={loading}
-          >
-            {loading ? (
-              <CircularProgress size={24} />
-            ) : selectedLoaiPhong ? (
-              'Cập nhật'
-            ) : (
-              'Thêm mới'
-            )}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+    <div style={{ padding: 24 }}>
+      <Title level={2}>Quản lý Loại Phòng</Title>
+      <Button
+        type="primary"
+        icon={<PlusOutlined />}
+        onClick={() => showModal()}
+        style={{ marginBottom: 16 }}
       >
-        <Alert
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+        Thêm Loại Phòng
+      </Button>
+      <Table
+        columns={columns}
+        dataSource={loaiPhongs}
+        rowKey="maLoaiPhong"
+        loading={loading}
+        pagination={pagination}
+        onChange={handleTableChange}
+        bordered
+      />
+      <Modal
+        title={editingLoaiPhong ? 'Sửa Loại Phòng' : 'Thêm Loại Phòng'}
+        open={isModalVisible}
+        onOk={handleOk}
+        onCancel={handleCancel}
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical" name="loaiPhongForm" initialValues={editingLoaiPhong || {}}>
+          <Form.Item
+            name="tenLoaiPhong"
+            label="Tên Loại Phòng"
+            rules={[{ required: true, message: 'Vui lòng nhập tên loại phòng!' }]}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="giaCoBan"
+            label="Giá Cơ Bản"
+            rules={[{ required: true, message: 'Vui lòng nhập giá cơ bản!' }]}
+          >
+            <InputNumber style={{ width: '100%' }} min={0} formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value.replace(/\$\s?|(,*)/g, '')} />
+          </Form.Item>
+          <Form.Item
+            name="soNguoiToiDa"
+            label="Số Người Tối Đa"
+            rules={[{ required: true, message: 'Vui lòng nhập số người tối đa!' }]}
+          >
+            <InputNumber style={{ width: '100%' }} min={1} />
+          </Form.Item>
+          <Form.Item name="moTa" label="Mô Tả">
+            <TextArea rows={4} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
   );
 };
 

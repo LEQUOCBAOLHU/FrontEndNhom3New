@@ -81,7 +81,7 @@ function DichVu() {
   const handleUpdateService = async (values) => {
     if (!selectedDichVu) return;
     try {
-      const response = await apiFetch(`http://localhost:5189/api/DichVu/${selectedDichVu.tenDichVu}`, {
+      const response = await apiFetch(`http://localhost:5189/api/DichVu/${selectedDichVu.maDichVu}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
@@ -100,9 +100,9 @@ function DichVu() {
     }
   };
 
-  const handleDeleteService = async (tenDichVu) => {
+  const handleDeleteService = async (maDichVu) => {
     try {
-      const response = await apiFetch(`http://localhost:5189/api/DichVu/${tenDichVu}`, {
+      const response = await apiFetch(`http://localhost:5189/api/DichVu/${maDichVu}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -187,7 +187,7 @@ function DichVu() {
           <Button
             danger
             icon={<DeleteOutlined />}
-            onClick={() => handleDeleteService(record.tenDichVu)}
+            onClick={() => handleDeleteService(record.maDichVu)}
           >
             Xóa
           </Button>
