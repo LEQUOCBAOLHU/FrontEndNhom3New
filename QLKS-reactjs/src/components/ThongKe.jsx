@@ -170,7 +170,7 @@ function ThongKe() {
         </>
       ) : (
          <div style={{ textAlign: 'center', padding: '50px' }}>
-            <Title level={5}>Không có dữ liệu để hiển thị.</Title>
+            <Title level={5}>Nhân Viên Không Được Xem Thống Kê</Title>
          </div>
       )}
 
