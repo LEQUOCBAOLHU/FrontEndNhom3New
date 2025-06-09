@@ -48,7 +48,7 @@ html, body {
 }
 
 .auth-container.dark {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  background: linear-gradient(135deg, var(--bg-main, #0f172a) 0%, var(--bg-paper, #1e293b) 100%);
 }
 
 /* Animated background elements */
@@ -97,8 +97,8 @@ html, body {
 }
 
 .dark .auth-box {
-  background: rgba(30, 41, 59, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-card, rgba(30, 41, 59, 0.8));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
@@ -123,8 +123,8 @@ html, body {
 }
 
 .dark .auth-title {
-  color: #fff;
-  background-image: linear-gradient(135deg, #fff 0%, rgba(255, 255, 255, 0.8) 100%);
+  color: var(--text-primary, #f8fafc);
+  background-image: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.8) 100%);
   -webkit-text-fill-color: transparent;
 }
 
@@ -144,7 +144,7 @@ html, body {
 }
 
 .dark .form-group label {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary, #f8fafc);
 }
 
 .form-input {
@@ -162,9 +162,9 @@ html, body {
 }
 
 .dark .form-input {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: var(--glass-bg, rgba(255,255,255,0.08));
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.1));
+  color: var(--text-primary, #f8fafc);
 }
 
 .light .form-input:focus {

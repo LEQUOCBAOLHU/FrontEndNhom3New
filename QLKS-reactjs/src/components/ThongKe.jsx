@@ -5,7 +5,9 @@ import {
 } from 'antd';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { apiFetch } from '../auth';
+import { useTheme } from '../contexts/ThemeContext';
 import dayjs from 'dayjs';
+import './ThongKe.css';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -22,35 +24,30 @@ function ThongKe() {
   const [dateRange, setDateRange] = useState(null);
   const [customRangeRevenue, setCustomRangeRevenue] = useState(null);
   const [loadingCustom, setLoadingCustom] = useState(false);
+  const { isDarkMode } = useTheme();
 
-  const fetchStats = async (y, m) => {
+  const fetchStats = async (y) => {
     setLoading(true);
     try {
-      const yearPromise = apiFetch(`https://qlks-0dvh.onrender.com/api/ThongKe/nam?nam=${y}`);
-      const monthPromise = apiFetch(`https://qlks-0dvh.onrender.com/api/ThongKe/thang?nam=${y}&thang=${m}`);
+      const response = await apiFetch(`http://localhost:5189/api/ThongKe/nam?nam=${y}`);
       
-      const [yearRes, monthRes] = await Promise.all([yearPromise, monthPromise]);
-      
-      if (!yearRes.ok || !monthRes.ok) {
+      if (!response.ok) {
         throw new Error('Không thể lấy dữ liệu thống kê');
       }
 
-      const yearStats = await yearRes.json();
-      const monthStats = await monthRes.json();
+      const data = await response.json();
+      console.log("Data received:", data); // For debugging
       
-      if(yearStats.data && monthStats.data) {
-        setStats({
-          year: yearStats.data,
-          month: monthStats.data
-        });
+      if (data.data) {
+        setStats(data.data);
       } else {
-        message.error('Không có dữ liệu thống kê cho thời gian đã chọn.');
+        message.error('Không có dữ liệu thống kê cho năm đã chọn.');
         setStats(null);
       }
-
     } catch (error) {
       console.error("Lỗi khi tải dữ liệu thống kê:", error);
       message.error(error.message || 'Lỗi khi tải dữ liệu thống kê.');
+      setStats(null);
     } finally {
       setLoading(false);
     }
@@ -81,8 +78,8 @@ function ThongKe() {
   };
 
   useEffect(() => {
-    fetchStats(year, month);
-  }, [year, month]);
+    fetchStats(year);
+  }, [year]);
 
   useEffect(() => {
     fetchCustomRangeStats();
@@ -93,107 +90,115 @@ function ThongKe() {
     return `${Math.round(value).toLocaleString('vi-VN')} VNĐ`;
   };
 
-  const revenueByMonthData = stats?.year?.doanhThuTheoThang?.map(item => ({
-    name: `Tháng ${item.thang}`,
-    'Doanh thu': item.tongDoanhThu,
-  })) || [];
+  // Transform data for the chart
+  const revenueByMonthData = React.useMemo(() => {
+    if (!stats?.doanhThuTheoThang) return [];
+    
+    // Create an array for all 12 months with 0 revenue
+    const monthlyData = Array.from({ length: 12 }, (_, index) => ({
+      name: `Tháng ${index + 1}`,
+      'Doanh thu': 0
+    }));
+
+    // Fill in actual revenue data
+    stats.doanhThuTheoThang.forEach(item => {
+      if (item.thang >= 1 && item.thang <= 12) {
+        monthlyData[item.thang - 1]['Doanh thu'] = item.tongDoanhThu;
+      }
+    });
+
+    return monthlyData;
+  }, [stats]);
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '50px' }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Title level={2}>Bảng thống kê</Title>
+    <div className="thongke-container">
+      <Title level={2} style={{ color: isDarkMode ? '#fff' : undefined }}>
+        Thống kê năm {year}
+      </Title>
       
       <Row gutter={[16, 24]} style={{ marginBottom: 24 }}>
         <Col xs={24} md={12}>
-            <Title level={4}>Thống kê theo tháng / năm</Title>
-            <Space>
-                <Select value={year} onChange={setYear} style={{ width: 120 }}>
-                    {years.map(y => <Option key={y} value={y}>{y}</Option>)}
-                </Select>
-                <Select value={month} onChange={setMonth} style={{ width: 120 }}>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <Option key={m} value={m}>Tháng {m}</Option>)}
-                </Select>
-            </Space>
+          <Card>
+            <Statistic 
+              title="Tổng doanh thu năm" 
+              value={formatCurrency(stats?.tongDoanhThu)}
+              className={isDarkMode ? 'dark-mode-statistic' : ''}
+            />
+          </Card>
         </Col>
         <Col xs={24} md={12}>
-           <Title level={4}>Thống kê theo khoảng thời gian tùy chỉnh</Title>
-           <RangePicker value={dateRange} onChange={setDateRange} />
+          <Card>
+            <Statistic 
+              title="Tổng số hóa đơn năm" 
+              value={stats?.tongSoHoaDon || 0}
+              suffix="hóa đơn"
+              className={isDarkMode ? 'dark-mode-statistic' : ''}
+            />
+          </Card>
         </Col>
       </Row>
 
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '50px' }}>
-          <Spin size="large" />
+      <Card style={{ marginBottom: 24 }}>
+        <Title level={4} style={{ color: isDarkMode ? '#fff' : undefined }}>
+          Biểu đồ doanh thu theo tháng - Năm {year}
+        </Title>
+        <div style={{ width: '100%', height: 400 }}>
+          <ResponsiveContainer>
+            <BarChart 
+              data={revenueByMonthData}
+              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#303030' : '#ccc'} />
+              <XAxis 
+                dataKey="name" 
+                stroke={isDarkMode ? '#fff' : '#666'}
+              />
+              <YAxis 
+                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                stroke={isDarkMode ? '#fff' : '#666'}
+              />
+              <Tooltip 
+                formatter={(value) => formatCurrency(value)}
+                contentStyle={{ 
+                  backgroundColor: isDarkMode ? '#1f1f1f' : '#fff',
+                  border: '1px solid #ccc'
+                }}
+                labelStyle={{ color: isDarkMode ? '#fff' : '#666' }}
+              />
+              <Legend wrapperStyle={{ color: isDarkMode ? '#fff' : '#666' }} />
+              <Bar 
+                dataKey="Doanh thu" 
+                fill="#8884d8" 
+                name="Doanh thu"
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
-      ) : stats ? (
-        <>
-          <Title level={4}>Thống kê tháng {month}/{year}</Title>
-          <Row gutter={16} style={{ marginBottom: 24 }}>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <Card>
-                <Statistic title="Doanh thu tháng" value={formatCurrency(stats.month.tongDoanhThu)} />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <Card>
-                <Statistic title="Số hóa đơn" value={stats.month.soLuongHoaDon} />
-              </Card>
-            </Col>
-          </Row>
+      </Card>
 
-          <Title level={4}>Thống kê năm {year}</Title>
-          <Row gutter={16} style={{ marginBottom: 24 }}>
-             <Col xs={24} sm={12} md={8} lg={6}>
-              <Card>
-                <Statistic title="Tổng doanh thu năm" value={formatCurrency(stats.year.tongDoanhThu)} />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <Card>
-                <Statistic title="Tổng số hóa đơn năm" value={stats.year.tongSoHoaDon} />
-              </Card>
-            </Col>
-          </Row>
-
-          <Card style={{ marginBottom: 24 }}>
-            <Title level={5}>Biểu đồ doanh thu theo tháng - Năm {year}</Title>
-            <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={revenueByMonthData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis tickFormatter={val => formatCurrency(val)} />
-                <Tooltip formatter={val => formatCurrency(val)} />
-                <Legend />
-                <Bar dataKey="Doanh thu" fill="#8884d8" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-        </>
-      ) : (
-         <div style={{ textAlign: 'center', padding: '50px' }}>
-            <Title level={5}>Nhân Viên Không Được Xem Thống Kê</Title>
-         </div>
-      )}
-
-      {loadingCustom && 
-        <div style={{ textAlign: 'center', padding: '50px' }}>
-          <Spin />
-        </div>
-      }
-      {customRangeRevenue && !loadingCustom && (
-        <Card>
-            <Title level={4}>
-                Doanh thu từ {dateRange[0].format('DD/MM/YYYY')} đến {dateRange[1].format('DD/MM/YYYY')}
-            </Title>
-            <Row gutter={16}>
-                <Col xs={24} sm={12}>
-                    <Statistic title="Tổng doanh thu" value={formatCurrency(customRangeRevenue.tongDoanhThu)} />
-                </Col>
-                <Col xs={24} sm={12}>
-                    <Statistic title="Số hóa đơn" value={customRangeRevenue.soLuongHoaDon} />
-                </Col>
-            </Row>
-        </Card>
-      )}
+      <Row gutter={[16, 16]}>
+        <Col xs={24}>
+          <Select 
+            value={year} 
+            onChange={setYear} 
+            style={{ width: 120, marginRight: 16 }}
+            dropdownStyle={{ backgroundColor: isDarkMode ? '#1f1f1f' : '#fff' }}
+          >
+            {years.map(y => (
+              <Option key={y} value={y}>{y}</Option>
+            ))}
+          </Select>
+        </Col>
+      </Row>
     </div>
   );
 }

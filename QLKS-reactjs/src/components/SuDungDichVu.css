@@ -1,67 +1,118 @@
-/* SuDungDichVu.css - hỗ trợ light/dark mode */
-.table-sddv {
-  width: 100%;
-  border-collapse: collapse;
-  color: var(--table-text, #222);
-}
-.table-sddv th, .table-sddv td {
-  border: 1px solid var(--table-border, #ddd);
-  padding: 8px;
-}
-.table-sddv th {
-  background-color: var(--table-th-bg, #fff3e0);
-  text-align: left;
-}
-[data-theme='dark'] .table-sddv {
-  --table-bg: #23272f;
-  --table-text: #f1f1f1;
-  --table-border: #444;
-  --table-th-bg: #3a2c1a;
-}
-
 /* SuDungDichVu.css */
-.sudungdichvu-container {
-  padding: 32px 0;
-  max-width: 1200px;
-  margin: 0 auto;
-  min-height: 80vh;
-  background: var(--bg-main, #f8fafc);
+.ant-card {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
 }
 
-[data-theme="dark"] .sudungdichvu-container {
-  background: #0f172a !important;
+.ant-table {
+  background: var(--bg-component);
 }
 
-.sudungdichvu-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 32px;
-}
-.sudungdichvu-title {
-  font-size: 2rem;
-  font-weight: 700;
-  background: linear-gradient(90deg, #4f46e5 0%, #818cf8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-.sudungdichvu-actions {
-  display: flex;
-  gap: 12px;
-}
-.sudungdichvu-table-card {
-  border-radius: 20px;
-  box-shadow: 0 4px 24px 0 rgba(79, 70, 229, 0.08);
-  background: rgba(255,255,255,0.95);
-  padding: 24px;
-}
-[data-theme="dark"] .sudungdichvu-table-card {
-  background: rgba(30, 41, 59, 0.95);
-  box-shadow: 0 4px 24px 0 rgba(79, 70, 229, 0.15);
+.ant-table-thead > tr > th {
+  background: var(--bg-table-header) !important;
+  color: var(--text-primary);
 }
 
-@media (max-width: 768px) {
-  .sudungdichvu-container { padding: 8px; }
-  .sudungdichvu-header { flex-direction: column; gap: 16px; }
-  .sudungdichvu-table-card { padding: 8px; }
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid var(--border-color);
 }
+
+.ant-table-tbody > tr:hover > td {
+  background: var(--bg-table-hover) !important;
+}
+
+.ant-modal-content {
+  border-radius: 8px;
+  background: var(--bg-component);
+}
+
+.ant-modal-header {
+  border-radius: 8px 8px 0 0;
+  background: var(--bg-component);
+}
+
+.ant-form-item-label > label {
+  color: var(--text-primary);
+}
+
+.ant-input,
+.ant-input-number,
+.ant-picker,
+.ant-select-selector {
+  background: var(--bg-input) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.ant-input:hover,
+.ant-input-number:hover,
+.ant-picker:hover,
+.ant-select-selector:hover {
+  border-color: var(--primary-color) !important;
+}
+
+.ant-input:focus,
+.ant-input-number-focused,
+.ant-picker-focused,
+.ant-select-focused .ant-select-selector {
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 0 0 2px var(--primary-shadow) !important;
+}
+
+.ant-btn {
+  border-radius: 6px;
+}
+
+.ant-btn-primary {
+  background: var(--primary-color);
+}
+
+.ant-btn-primary:hover {
+  background: var(--primary-hover);
+}
+
+.ant-btn-dangerous {
+  background: var(--error-color);
+  border-color: var(--error-color);
+}
+
+.ant-btn-dangerous:hover {
+  background: var(--error-hover);
+  border-color: var(--error-hover);
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .ant-card {
+  background: var(--bg-component-dark);
+}
+
+[data-theme="dark"] .ant-table {
+  background: var(--bg-component-dark);
+}
+
+[data-theme="dark"] .ant-table-thead > tr > th {
+  background: var(--bg-table-header-dark) !important;
+  color: var(--text-primary-dark);
+}
+
+[data-theme="dark"] .ant-table-tbody > tr > td {
+  border-bottom: 1px solid var(--border-color-dark);
+}
+
+[data-theme="dark"] .ant-modal-content,
+[data-theme="dark"] .ant-modal-header {
+  background: var(--bg-component-dark);
+}
+
+[data-theme="dark"] .ant-form-item-label > label {
+  color: var(--text-primary-dark);
+}
+
+[data-theme="dark"] .ant-input,
+[data-theme="dark"] .ant-input-number,
+[data-theme="dark"] .ant-picker,
+[data-theme="dark"] .ant-select-selector {
+  background: var(--bg-input-dark) !important;
+  border-color: var(--border-color-dark) !important;
+  color: var(--text-primary-dark) !important;
+} 

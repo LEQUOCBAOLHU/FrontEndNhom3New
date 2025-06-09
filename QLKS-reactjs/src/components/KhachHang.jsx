@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
   Table, Button, Modal, Form, Input, Typography,
-  Card, Row, Col, Space, message, Tag, Select
+  Card, Row, Col, Space, message, Tag, Select, Statistic
 } from 'antd';
 import { 
   PlusOutlined, SearchOutlined, EditOutlined, 
-  DeleteOutlined, ReloadOutlined, HistoryOutlined 
+  DeleteOutlined, ReloadOutlined
 } from '@ant-design/icons';
 import './KhachHang.css';
 import { apiFetch } from '../auth';
@@ -17,7 +17,6 @@ const { Option } = Select;
 function KhachHang() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
-  const [isHistoryModalVisible, setIsHistoryModalVisible] = useState(false);
   const [khachHangs, setKhachHangs] = useState([]);
   const [selectedKhachHang, setSelectedKhachHang] = useState(null);
   const [form] = Form.useForm();
@@ -26,9 +25,7 @@ function KhachHang() {
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
-    inactive: 0
   });
-  const [historyData, setHistoryData] = useState([]);
 
   const fetchKhachHangs = async () => {
     setLoading(true);
@@ -45,7 +42,6 @@ function KhachHang() {
         setStats({
           total: list.length,
           active: list.filter(kh => kh.isActive !== false).length,
-          inactive: list.filter(kh => kh.isActive === false).length
         });
       }
     } catch (error) {
@@ -135,61 +131,55 @@ function KhachHang() {
     }
   };
 
-  const handleViewHistory = async (hoTen) => {
-    try {
-      const response = await apiFetch(`http://localhost:5189/api/HoaDon/khach-hang/${hoTen}?pageNumber=1&pageSize=100`);
-      if (response.ok) {
-        const data = await response.json();
-        setHistoryData(data.data?.hoaDons || []);
-        setIsHistoryModalVisible(true);
-      }
-    } catch (error) {
-      console.error('Error fetching customer history:', error);
-      message.error('Đã xảy ra lỗi khi tải lịch sử khách hàng!');
-    }
-  };
-
   const columns = [
     {
       title: 'Mã khách hàng',
       dataIndex: 'maKh',
       key: 'maKh',
+      width: '10%',
       sorter: (a, b) => a.maKh - b.maKh,
     },
     {
       title: 'Họ tên',
       dataIndex: 'hoTen',
       key: 'hoTen',
+      width: '15%',
       sorter: (a, b) => a.hoTen.localeCompare(b.hoTen),
     },
     {
       title: 'CCCD/Passport',
       dataIndex: 'cccdPassport',
       key: 'cccdPassport',
+      width: '15%',
     },
     {
       title: 'Số điện thoại',
       dataIndex: 'soDienThoai',
       key: 'soDienThoai',
+      width: '15%',
     },
     {
       title: 'Quốc tịch',
       dataIndex: 'quocTich',
       key: 'quocTich',
+      width: '10%',
     },
     {
       title: 'Ghi chú',
       dataIndex: 'ghiChu',
       key: 'ghiChu',
+      width: '15%',
       ellipsis: true,
     },
     {
       title: 'Thao tác',
       key: 'action',
+      width: '20%',
       render: (_, record) => (
-        <Space size="middle">
+        <Space size="small">
           <Button
             type="primary"
+            size="small"
             icon={<EditOutlined />}
             onClick={() => {
               setSelectedKhachHang(record);
@@ -201,53 +191,13 @@ function KhachHang() {
           </Button>
           <Button
             danger
+            size="small"
             icon={<DeleteOutlined />}
             onClick={() => handleDeleteCustomer(record.hoTen)}
           >
             Xóa
           </Button>
-          <Button
-            icon={<HistoryOutlined />}
-            onClick={() => handleViewHistory(record.hoTen)}
-          >
-            Lịch sử
-          </Button>
         </Space>
-      ),
-    },
-  ];
-
-  const historyColumns = [
-    {
-      title: 'Mã hóa đơn',
-      dataIndex: 'maHoaDon',
-      key: 'maHoaDon',
-    },
-    {
-      title: 'Ngày lập',
-      dataIndex: 'ngayLap',
-      key: 'ngayLap',
-      render: (text) => text ? new Date(text).toLocaleDateString() : '',
-    },
-    {
-      title: 'Tổng tiền',
-      dataIndex: 'tongTien',
-      key: 'tongTien',
-      render: (text) => `${text?.toLocaleString()} VNĐ`,
-    },
-    {
-      title: 'Phương thức thanh toán',
-      dataIndex: 'phuongThucThanhToan',
-      key: 'phuongThucThanhToan',
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'trangThai',
-      key: 'trangThai',
-      render: (text) => (
-        <Tag color={text === 'Đã thanh toán' ? 'green' : 'orange'}>
-          {text}
-        </Tag>
       ),
     },
   ];
@@ -256,24 +206,23 @@ function KhachHang() {
     <div className="khachhang-container">
       <Title level={2} className="page-title">Quản lý Khách hàng</Title>
 
-      {/* Stats Section */}
-      <Row gutter={[16, 16]} className="stats-section">
-        <Col xs={24} sm={8}>
-          <Card className="stat-card">
-            <Title level={4}>Tổng số khách hàng</Title>
-            <div className="stat-value">{stats.total}</div>
+      <Row gutter={16} className="stats-row">
+        <Col span={8}>
+          <Card>
+            <Statistic
+              title="Tổng số khách hàng"
+              value={stats.total}
+              valueStyle={{ color: '#1890ff' }}
+            />
           </Card>
         </Col>
-        <Col xs={24} sm={8}>
-          <Card className="stat-card">
-            <Title level={4}>Đang hoạt động</Title>
-            <div className="stat-value">{stats.active}</div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card className="stat-card">
-            <Title level={4}>Ngừng hoạt động</Title>
-            <div className="stat-value">{stats.inactive}</div>
+        <Col span={8}>
+          <Card>
+            <Statistic
+              title="Đang hoạt động"
+              value={stats.active}
+              valueStyle={{ color: '#52c41a' }}
+            />
           </Card>
         </Col>
       </Row>
@@ -307,17 +256,20 @@ function KhachHang() {
         </Space>
       </div>
 
-      {/* Customers Table */}
+      {/* Table Card */}
       <Card className="table-card">
         <Table
           columns={columns}
           dataSource={khachHangs}
           rowKey="maKh"
           loading={loading}
+          size="small"
           pagination={{
             pageSize: 10,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} khách hàng`
           }}
+          bordered
+          scroll={{ x: true }}
         />
       </Card>
 
@@ -421,25 +373,6 @@ function KhachHang() {
             </Space>
           </Form.Item>
         </Form>
-      </Modal>
-
-      {/* History Modal */}
-      <Modal
-        title="Lịch sử khách hàng"
-        open={isHistoryModalVisible}
-        onCancel={() => setIsHistoryModalVisible(false)}
-        width={1000}
-        footer={null}
-      >
-        <Table
-          columns={historyColumns}
-          dataSource={historyData}
-          rowKey="maHoaDon"
-          pagination={{
-            pageSize: 5,
-            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} hóa đơn`
-          }}
-        />
       </Modal>
     </div>
   );

@@ -53,6 +53,17 @@
   color: var(--phong-text-secondary);
 }
 
+[data-theme="dark"] .phong-container {
+  background: var(--bg-main, #0f172a);
+  color: var(--text-primary, #f8fafc);
+}
+[data-theme="dark"] .ant-card {
+  background: rgba(30, 41, 59, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+[data-theme="dark"] .ant-typography, [data-theme="dark"] .ant-typography-secondary {
+  color: var(--text-primary, #f8fafc) !important;
+}
 
 /* ==========================================================================
    3. STATS & CHART SECTION
@@ -190,4 +201,182 @@
   .phong-container .ant-statistic-content {
     font-size: 20px;
   }
+}
+
+/* Dark mode styles for modal */
+[data-theme="dark"] .ant-modal-content {
+  background-color: #1a1f2e;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .ant-modal-header {
+  background-color: #1a1f2e;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .ant-modal-title {
+  color: #ffffff;
+  font-size: 1.2rem;
+}
+
+[data-theme="dark"] .ant-modal-close {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+[data-theme="dark"] .ant-modal-close:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+[data-theme="dark"] .ant-modal-body {
+  background-color: #1a1f2e;
+  color: #ffffff;
+  padding: 24px;
+}
+
+[data-theme="dark"] .ant-modal-footer {
+  background-color: #1a1f2e;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 16px 24px;
+}
+
+/* Dark mode styles for form elements inside modal */
+[data-theme="dark"] .ant-form-item {
+  margin-bottom: 20px;
+}
+
+[data-theme="dark"] .ant-form-item-label > label {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+[data-theme="dark"] .ant-form-item-required::before {
+  color: #ff4d4f !important;
+}
+
+[data-theme="dark"] .ant-input {
+  background-color: #2a3241;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  height: 36px;
+  padding: 8px 12px;
+  transition: all 0.3s ease;
+}
+
+[data-theme="dark"] .ant-input:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  background-color: #2a3241;
+}
+
+[data-theme="dark"] .ant-input:focus,
+[data-theme="dark"] .ant-input-focused {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+  background-color: #2a3241;
+}
+
+[data-theme="dark"] .ant-select:not(.ant-select-customize-input) .ant-select-selector {
+  background-color: #2a3241;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  height: 36px;
+  padding: 4px 12px;
+}
+
+[data-theme="dark"] .ant-select-focused:not(.ant-select-disabled).ant-select:not(.ant-select-customize-input) .ant-select-selector {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+[data-theme="dark"] .ant-select-dropdown {
+  background-color: #2a3241;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .ant-select-item {
+  color: rgba(255, 255, 255, 0.85);
+  padding: 8px 12px;
+}
+
+[data-theme="dark"] .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background-color: rgba(24, 144, 255, 0.15);
+  color: #1890ff;
+}
+
+/* Dark mode styles for buttons */
+[data-theme="dark"] .ant-modal-footer .ant-btn {
+  height: 36px;
+  padding: 4px 16px;
+  border-radius: 4px;
+  font-size: 0.95rem;
+}
+
+[data-theme="dark"] .ant-btn-default {
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+[data-theme="dark"] .ant-btn-default:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+[data-theme="dark"] .ant-btn-primary {
+  background-color: #1890ff;
+  border-color: #1890ff;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .ant-btn-primary:hover {
+  background-color: #40a9ff;
+  border-color: #40a9ff;
+}
+
+/* Dark mode styles for textarea */
+[data-theme="dark"] .ant-input[type="textarea"] {
+  min-height: 100px;
+  padding: 8px 12px;
+  background-color: #2a3241;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+[data-theme="dark"] .ant-input[type="textarea"]:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="dark"] .ant-input[type="textarea"]:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+/* Dark mode styles for form validation messages */
+[data-theme="dark"] .ant-form-item-explain,
+[data-theme="dark"] .ant-form-item-extra {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+[data-theme="dark"] .ant-form-item-has-error .ant-input,
+[data-theme="dark"] .ant-form-item-has-error .ant-input:hover,
+[data-theme="dark"] .ant-form-item-has-error .ant-select:not(.ant-select-disabled):not(.ant-select-customize-input) .ant-select-selector {
+  background-color: #2a3241;
+  border-color: #ff4d4f;
+}
+
+[data-theme="dark"] .ant-form-item-has-error .ant-form-item-explain {
+  color: #ff4d4f;
+}
+
+/* Dark mode styles for modal backdrop */
+[data-theme="dark"] .ant-modal-mask {
+  background-color: rgba(0, 0, 0, 0.75);
 }

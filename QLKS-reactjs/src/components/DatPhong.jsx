@@ -3,8 +3,6 @@ import { Table, Button, Modal, Form, DatePicker, Space, Popconfirm, message, Sel
 import { apiFetch } from '../auth';
 import dayjs from 'dayjs';
 import './DatPhong.css';
-import { useNavigate } from 'react-router-dom';
-
 function DatPhong() {
   const [datPhongs, setDatPhongs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -17,7 +15,6 @@ function DatPhong() {
   const [loadingPhong, setLoadingPhong] = useState(false);
   const [loadingKhachHang, setLoadingKhachHang] = useState(false);
   const [form] = Form.useForm();
-  const navigate = useNavigate();
 
   // Lấy danh sách đặt phòng
   const fetchDatPhongs = async () => {
@@ -131,25 +128,6 @@ function DatPhong() {
     await Promise.all([fetchDatPhongs(), fetchPhongs(), fetchKhachHangs()]);
   };
 
-  const handleCreateInvoice = async (datPhong) => {
-    try {
-      const res = await apiFetch(`http://localhost:5189/api/HoaDon/from-dat-phong/${datPhong.maDatPhong}`, {
-        method: 'POST',
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Tạo hóa đơn thất bại');
-      }
-
-      const newInvoice = await res.json();
-      message.success(`Tạo hóa đơn ${newInvoice.data.maHoaDon} thành công!`);
-      navigate('/dashboard/hoadon'); 
-    } catch (e) {
-      console.error('Error creating invoice from booking:', e);
-      message.error(`Lỗi: ${e.message}`);
-    }
-  };
 
   // Xử lý xóa đặt phòng
   const handleDelete = async (maDatPhong) => {
@@ -358,14 +336,6 @@ function DatPhong() {
           >
             <Button danger>Xóa</Button>
           </Popconfirm>
-          <Button 
-            type="primary" 
-            ghost 
-            onClick={() => handleCreateInvoice(record)}
-            disabled={record.trangThai === 'Đã hủy' || record.trangThai === 'Đã thanh toán'}
-          >
-            Thanh toán
-          </Button>
         </Space>
       ),
     },
@@ -511,30 +481,98 @@ function DatPhong() {
         open={isDetailModalVisible}
         onCancel={() => setIsDetailModalVisible(false)}
         footer={null}
-        width={600}
+        width={800}
       >
         {chiTietDatPhong && (
           <div>
             <Descriptions bordered column={1}>
               <Descriptions.Item label="Mã đặt phòng">{chiTietDatPhong.maDatPhong}</Descriptions.Item>
-              <Descriptions.Item label="Tên phòng">{chiTietDatPhong.tenPhong}</Descriptions.Item>
+              <Descriptions.Item label="Tên phòng">{chiTietDatPhong.tenPhong || chiTietDatPhong.maPhong}</Descriptions.Item>
               <Descriptions.Item label="Khách hàng đại diện">{chiTietDatPhong.tenKhachHang}</Descriptions.Item>
+              <Descriptions.Item label="Ngày đặt">{dayjs(chiTietDatPhong.ngayDat).format('DD/MM/YYYY')}</Descriptions.Item>
               <Descriptions.Item label="Ngày nhận phòng">{dayjs(chiTietDatPhong.ngayNhanPhong).format('DD/MM/YYYY HH:mm')}</Descriptions.Item>
               <Descriptions.Item label="Ngày trả phòng">{dayjs(chiTietDatPhong.ngayTraPhong).format('DD/MM/YYYY HH:mm')}</Descriptions.Item>
               <Descriptions.Item label="Số người ở">{chiTietDatPhong.soNguoiO}</Descriptions.Item>
               <Descriptions.Item label="Trạng thái">{chiTietDatPhong.trangThai}</Descriptions.Item>
+              <Descriptions.Item label="Tổng tiền phòng">
+                {chiTietDatPhong.tongTienPhong?.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' }) || '0 VND'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Phụ thu">
+                {chiTietDatPhong.phuThu?.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' }) || '0 VND'}
+              </Descriptions.Item>
             </Descriptions>
             
-            <h4 style={{marginTop: 20}}>Danh sách khách ở</h4>
+            <h4 style={{marginTop: 20, marginBottom: 16}}>Danh sách khách ở</h4>
             <List
               bordered
-              dataSource={chiTietDatPhong.danhSachKhachHang || []}
+              dataSource={[
+                { hoTen: chiTietDatPhong.tenKhachHang, isRepresentative: true },
+                ...(chiTietDatPhong.danhSachKhachHang || []).filter(kh => kh.hoTen !== chiTietDatPhong.tenKhachHang)
+              ]}
               renderItem={item => (
                 <List.Item>
-                  {item.hoTen} ({item.soCmnd})
+                  {item.hoTen} {item.isRepresentative && "(Đại diện)"}
                 </List.Item>
               )}
             />
+
+            {chiTietDatPhong.danhSachDichVu && chiTietDatPhong.danhSachDichVu.length > 0 && (
+              <>
+                <h4 style={{marginTop: 20, marginBottom: 16}}>Dịch vụ đã sử dụng ({chiTietDatPhong.soLuongDichVuSuDung} dịch vụ)</h4>
+                <Table
+                  bordered
+                  size="small"
+                  pagination={false}
+                  dataSource={chiTietDatPhong.danhSachDichVu}
+                  columns={[
+                    {
+                      title: 'Tên dịch vụ',
+                      dataIndex: 'tenDichVu',
+                      key: 'tenDichVu'
+                    },
+                    {
+                      title: 'Số lượng',
+                      dataIndex: 'soLuong',
+                      key: 'soLuong'
+                    },
+                    {
+                      title: 'Thành tiền',
+                      dataIndex: 'thanhTien',
+                      key: 'thanhTien',
+                      render: (value) => value?.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' }) || '0 VND'
+                    }
+                  ]}
+                />
+              </>
+            )}
+
+            <div style={{ marginTop: 20, padding: '16px', border: '1px solid #f0f0f0', borderRadius: '8px', backgroundColor: '#fafafa' }}>
+              <div style={{ fontSize: 15 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span>Tiền phòng:</span>
+                  <span>{chiTietDatPhong.tongTienPhong?.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' }) || '0 VND'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span>Phụ thu:</span>
+                  <span>{chiTietDatPhong.phuThu?.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' }) || '0 VND'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span>Tổng tiền dịch vụ:</span>
+                  <span>
+                    {(chiTietDatPhong.danhSachDichVu?.reduce((sum, item) => sum + (item.thanhTien || 0), 0) || 0)
+                      .toLocaleString('vi-VN', { style: 'currency', currency: 'VND' })}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTop: '1px solid #d9d9d9', fontWeight: 'bold', fontSize: 16 }}>
+                  <span>Tổng cộng:</span>
+                  <span>{(
+                    (chiTietDatPhong.tongTienPhong || 0) + 
+                    (chiTietDatPhong.phuThu || 0) + 
+                    (chiTietDatPhong.danhSachDichVu?.reduce((sum, item) => sum + (item.thanhTien || 0), 0) || 0)
+                  ).toLocaleString('vi-VN', { style: 'currency', currency: 'VND' })}</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </Modal>

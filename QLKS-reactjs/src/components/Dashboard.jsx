@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, Routes, Route, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Dropdown, Space, Avatar } from 'antd';
-import { BiMenu, BiSun, BiMoon, BiUser, BiBook, BiChart, BiLogOut, BiHome, BiKey, BiDownArrow } from 'react-icons/bi';
+import { BiMenu, BiUser, BiBook, BiChart, BiLogOut, BiHome, BiKey, BiDownArrow } from 'react-icons/bi';
 import { useTheme } from '../contexts/ThemeContext';
 import { apiFetch } from '../auth';
+import Switch from './Switch';
 import Phong from './Phong';
 import DichVu from './DichVu';
 import KhachHang from './KhachHang';
@@ -20,29 +21,21 @@ import SuDungDichVu from './SuDungDichVu';
 import './Dashboard.css';
 
 // Icons import
-import { MdHotel, MdRoomService, MdMeetingRoom, MdAssignment, MdReceipt, MdAttachMoney, MdMiscellaneousServices } from 'react-icons/md';
-import TichDiemAdmin from './TichDiemAdmin';
-import LichSuTichDiemAdmin from './LichSuTichDiemAdmin';
-import BaoCao from './BaoCao';
+import { MdHotel, MdRoomService, MdMeetingRoom, MdAssignment, MdReceipt, MdAttachMoney, MdMiscellaneousServices, MdDashboard, MdPeople, MdPriceChange, MdBarChart, MdAssessment, MdPerson } from 'react-icons/md';
 import ChangePassword from './ChangePassword';
 
 const menuItems = [
-  { icon: <BiHome size={24} />, label: 'Dashboard', path: '/dashboard' },
-  { icon: <MdHotel size={24} />, label: 'Phòng', path: '/dashboard/phong' },
-  { icon: <MdMeetingRoom size={24} />, label: 'Loại phòng', path: '/dashboard/loaiphong' },
+  { icon: <MdDashboard size={24} />, label: 'Dashboard', path: '/dashboard' },
+  { icon: <MdPeople size={24} />, label: 'Khách hàng', path: '/dashboard/khachhang' },
+  { icon: <MdMeetingRoom size={24} />, label: 'Phòng', path: '/dashboard/phong' },
   { icon: <MdRoomService size={24} />, label: 'Dịch vụ', path: '/dashboard/dichvu' },
-  { icon: <BiUser size={24} />, label: 'Khách hàng', path: '/dashboard/khachhang' },
-  { icon: <BiUser size={24} />, label: 'Nhân viên', path: '/dashboard/nhanvien', adminOnly: true },
-  { icon: <BiUser size={24} />, label: 'Tài khoản', path: '/dashboard/account', adminOnly: true },
-  { icon: <MdAssignment size={24} />, label: 'Đặt phòng', path: '/dashboard/datphong' },
   { icon: <MdReceipt size={24} />, label: 'Hóa đơn', path: '/dashboard/hoadon' },
-  { icon: <BiChart size={24} />, label: 'Thống kê', path: '/dashboard/thongke' },
+  { icon: <MdAssignment size={24} />, label: 'Đặt phòng', path: '/dashboard/datphong' },
   { icon: <BiBook size={24} />, label: 'QL Tất cả phòng', path: '/dashboard/quanlyphong', adminOnly: true },
-  { icon: <MdAttachMoney size={24} />, label: 'Phụ thu', path: '/dashboard/phuthu' },
+  { icon: <MdPriceChange size={24} />, label: 'Phụ thu', path: '/dashboard/phuthu' },
   { icon: <MdMiscellaneousServices size={24} />, label: 'Sử dụng dịch vụ', path: '/dashboard/sudungdichvu' },
-  { icon: <BiBook size={24} />, label: 'Quản lý tích điểm', path: '/dashboard/tich-diem-admin', adminOnly: true },
-  { icon: <BiBook size={24} />, label: 'Lịch sử tích điểm', path: '/dashboard/lich-su-tich-diem-admin', adminOnly: true },
-  { icon: <BiBook size={24} />, label: 'Báo cáo', path: '/dashboard/bao-cao', adminOnly: true }
+  { icon: <MdBarChart size={24} />, label: 'Thống kê', path: '/dashboard/thongke' },
+  { icon: <MdPerson size={24} />, label: 'Tài khoản', path: '/dashboard/account' },
 ];
 
 const StatCard = ({ icon, label, value, type }) => (
@@ -60,8 +53,6 @@ const StatCard = ({ icon, label, value, type }) => (
 );
 
 const Dashboard = () => {
-  const [isOpen, setIsOpen] = useState(true);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [dashboardStats, setDashboardStats] = useState({
     totalRevenue: 0,
     totalBookings: 0,
@@ -79,15 +70,14 @@ const Dashboard = () => {
 
   // Lọc menu items dựa trên vai trò
   const filteredMenuItems = menuItems.filter(item => {
+    // Luôn hiển thị mục 'Tài khoản' (Account) cho mọi vai trò
+    if (item.label === 'Tài khoản') return true;
     // Chuyển vai trò về chữ thường để so sánh không phân biệt hoa/thường
     if (role.toLowerCase() === 'quanly') return true;
     return !item.adminOnly;
   });
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 768);
-    window.addEventListener('resize', handleResize);
-
     const fetchDashboardStats = async () => {
       setLoadingStats(true);
       try {
@@ -143,11 +133,7 @@ const Dashboard = () => {
     };
 
     fetchDashboardStats();
-    
-    return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  const toggleSidebar = () => setIsOpen(!isOpen);
 
   const handleLogout = async () => {
     try {
@@ -180,9 +166,9 @@ const Dashboard = () => {
       <Link to="/dashboard/change-password" className="user-dropdown-item">
         <BiKey /> Đổi mật khẩu
       </Link>
-      <div onClick={handleLogout} className="user-dropdown-item">
+      <button onClick={handleLogout} className="user-dropdown-item" style={{background: 'none', border: 'none', width: '100%', textAlign: 'left', padding: 0}}>
         <BiLogOut /> Đăng xuất
-      </div>
+      </button>
     </div>
   );
   
@@ -193,19 +179,15 @@ const Dashboard = () => {
     <div className="dashboard-container">
       {/* Sidebar */}
       <motion.div 
-        className={`sidebar ${isOpen ? 'open' : ''}`}
-        animate={{ width: isOpen ? '240px' : '80px' }}
+        className="sidebar open"
+        animate={{ width: '240px' }}
         transition={{ duration: 0.3, type: "tween" }}
       >
         <div className="sidebar-header">
-          <motion.h1 animate={{ opacity: isOpen ? 1 : 0 }}>
+          <motion.h1 animate={{ opacity: 1 }}>
             QLKS
           </motion.h1>
-          <button className="toggle-btn" onClick={toggleSidebar}>
-            <BiMenu size={24} />
-          </button>
         </div>
-
         <div className="sidebar-menu">
           {filteredMenuItems.map((item, index) => (
             <motion.div
@@ -214,10 +196,13 @@ const Dashboard = () => {
               whileHover={{ scale: 1.02, x: 5 }}
               whileTap={{ scale: 0.95 }}
             >
-              <Link to={item.path} className="menu-link">
+              <Link 
+                to={item.path} 
+                className={`menu-link ${location.pathname === item.path ? 'active' : ''}`}
+              >
                 {item.icon}
                 <motion.span
-                  animate={{ opacity: isOpen ? 1 : 0 }}
+                  animate={{ opacity: 1 }}
                   className="menu-label"
                 >
                   {item.label}
@@ -225,47 +210,31 @@ const Dashboard = () => {
               </Link>
             </motion.div>
           ))}
-          
-          {/* Theme toggle button */}
-          <motion.div
-            className="menu-item theme-toggle"
-            whileHover={{ scale: 1.02, x: 5 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <button className="menu-link" onClick={toggleTheme}>
-              {isDarkMode ? <BiSun size={20} /> : <BiMoon size={20} />}
-              <motion.span
-                className="menu-label"
-                animate={{ opacity: isOpen ? 1 : 0 }}
-              >
-                {isDarkMode ? 'Chế độ sáng' : 'Chế độ tối'}
-              </motion.span>
-            </button>
-          </motion.div>
+          <div className="sidebar-user-menu">
+            <Dropdown overlay={userMenuItems} trigger={['click']} placement="topLeft">
+              <a onClick={e => e.preventDefault()} className="user-menu-trigger">
+                <Space>
+                  <Avatar icon={<BiUser />} />
+                  <span>{user.hoTen || 'User'}</span>
+                  <BiDownArrow />
+                </Space>
+              </a>
+            </Dropdown>
+          </div>
         </div>
       </motion.div>
 
       {/* Main Content */}
-      <main className={`main-content ${isOpen ? 'sidebar-open' : ''}`}>
+      <main className="main-content sidebar-open">
         <div className="top-bar">
-          <button className="mobile-menu" onClick={toggleSidebar}>
-            <BiMenu size={24} />
-          </button>
           <div className="page-title">{currentPage}</div>
-          
-          <Dropdown overlay={userMenuItems} trigger={['click']}>
-            <a onClick={e => e.preventDefault()} className="user-menu-trigger">
-              <Space>
-                <Avatar icon={<BiUser />} />
-                <span>{user.hoTen || 'User'}</span>
-                <BiDownArrow />
-              </Space>
-            </a>
-          </Dropdown>
+          <div className="top-bar-right">
+            <Switch isDarkMode={isDarkMode} onChange={toggleTheme} />
+          </div>
         </div>
 
         <Routes>
-          <Route path="" element={
+          <Route path="/" element={
             <div className="dashboard-content">
               <div className="welcome-section">
                 <motion.h1
@@ -318,22 +287,16 @@ const Dashboard = () => {
               </div>
             </div>
           } />
+          <Route path="khachhang" element={<KhachHang />} />
           <Route path="phong" element={<Phong />} />
           <Route path="dichvu" element={<DichVu />} />
-          <Route path="khachhang" element={<KhachHang />} />
-          <Route path="nhanvien" element={<NhanVien />} />
-          <Route path="loaiphong" element={<LoaiPhong />} />
-          <Route path="account" element={<Account />} />
-          <Route path="datphong" element={<DatPhong />} />
           <Route path="hoadon" element={<HoaDon />} />
-          <Route path="thongke" element={<ThongKe />} />
+          <Route path="datphong" element={<DatPhong />} />
           <Route path="quanlyphong" element={<QuanLyPhong />} />
           <Route path="phuthu" element={<PhuThu />} />
           <Route path="sudungdichvu" element={<SuDungDichVu />} />
-          <Route path="tich-diem-admin" element={<TichDiemAdmin />} />
-          <Route path="lich-su-tich-diem-admin" element={<LichSuTichDiemAdmin />} />
-          <Route path="bao-cao" element={<BaoCao />} />
-          <Route path="change-password" element={<ChangePassword />} />
+          <Route path="thongke" element={<ThongKe />} />
+          <Route path="account" element={<Account />} />
         </Routes>
       </main>
 
@@ -348,6 +311,30 @@ const Dashboard = () => {
           .main-content { padding: 2px; }
           .stats-grid { grid-template-columns: 1fr !important; }
           .action-buttons { flex-direction: column; gap: 8px; }
+        }
+
+        .dashboard-container {
+          background: var(--background-dark);
+          min-height: 100vh;
+          width: 100%;
+          display: flex;
+        }
+
+        .main-content {
+          flex: 1;
+          background: inherit;
+          min-height: 100vh;
+          overflow-y: auto;
+        }
+
+        [data-theme='dark'] .dashboard-container,
+        [data-theme='dark'] .main-content {
+          background: #1a1a2e;
+        }
+
+        [data-theme='light'] .dashboard-container,
+        [data-theme='light'] .main-content {
+          background: #f0f2f5;
         }
       `}</style>
     </div>

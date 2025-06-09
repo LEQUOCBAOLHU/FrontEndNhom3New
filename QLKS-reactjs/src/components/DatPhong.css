@@ -11,3 +11,7 @@
 [data-theme="dark"] .datphong-title {
   color: #fff !important;
 }
+[data-theme="dark"] .datphong-container {
+  background: var(--bg-main, #0f172a);
+  color: var(--text-primary, #f8fafc);
+}

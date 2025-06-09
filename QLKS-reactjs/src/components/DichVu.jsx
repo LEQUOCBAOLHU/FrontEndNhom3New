@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Table, Button, Modal, Form, Input, InputNumber,
-  Typography, Card, Row, Col, Space, message, Tag
+  Typography, Card, Row, Col, Space, message, Tag, Statistic
 } from 'antd';
 import { 
   PlusOutlined, SearchOutlined, EditOutlined, 
@@ -23,8 +23,7 @@ function DichVu() {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
-    active: 0,
-    inactive: 0
+    active: 0
   });
 
   const fetchDichVus = async () => {
@@ -41,8 +40,7 @@ function DichVu() {
         // Tính toán thống kê
         setStats({
           total: list.length,
-          active: list.filter(dv => dv.isActive !== false).length,
-          inactive: list.filter(dv => dv.isActive === false).length
+          active: list.filter(dv => dv.isActive !== false).length
         });
       }
     } catch (error) {
@@ -81,7 +79,7 @@ function DichVu() {
   const handleUpdateService = async (values) => {
     if (!selectedDichVu) return;
     try {
-      const response = await apiFetch(`http://localhost:5189/api/DichVu/${selectedDichVu.maDichVu}`, {
+      const response = await apiFetch(`http://localhost:5189/api/DichVu/${encodeURIComponent(selectedDichVu.tenDichVu)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
@@ -92,7 +90,8 @@ function DichVu() {
         form.resetFields();
         fetchDichVus();
       } else {
-        message.error('Cập nhật dịch vụ thất bại!');
+        const errorData = await response.json().catch(() => ({}));
+        message.error(errorData.message || 'Cập nhật dịch vụ thất bại!');
       }
     } catch (error) {
       console.error('Error updating service:', error);
@@ -100,16 +99,17 @@ function DichVu() {
     }
   };
 
-  const handleDeleteService = async (maDichVu) => {
+  const handleDeleteService = async (tenDichVu) => {
     try {
-      const response = await apiFetch(`http://localhost:5189/api/DichVu/${maDichVu}`, {
+      const response = await apiFetch(`http://localhost:5189/api/DichVu/${encodeURIComponent(tenDichVu)}`, {
         method: 'DELETE',
       });
       if (response.ok) {
         message.success('Xóa dịch vụ thành công!');
         fetchDichVus();
       } else {
-        message.error('Xóa dịch vụ thất bại!');
+        const errorData = await response.json().catch(() => ({}));
+        message.error(errorData.message || 'Xóa dịch vụ thất bại!');
       }
     } catch (error) {
       console.error('Error deleting service:', error);
@@ -187,7 +187,7 @@ function DichVu() {
           <Button
             danger
             icon={<DeleteOutlined />}
-            onClick={() => handleDeleteService(record.maDichVu)}
+            onClick={() => handleDeleteService(record.tenDichVu)}
           >
             Xóa
           </Button>
@@ -201,23 +201,23 @@ function DichVu() {
       <Title level={2} className="page-title">Quản lý Dịch vụ</Title>
 
       {/* Stats Section */}
-      <Row gutter={[16, 16]} className="stats-section">
-        <Col xs={24} sm={8}>
-          <Card className="stat-card">
-            <Title level={4}>Tổng số dịch vụ</Title>
-            <div className="stat-value">{stats.total}</div>
+      <Row gutter={16} className="stats-row">
+        <Col span={12}>
+          <Card>
+            <Statistic
+              title="Tổng số dịch vụ"
+              value={stats.total}
+              valueStyle={{ color: '#1890ff' }}
+            />
           </Card>
         </Col>
-        <Col xs={24} sm={8}>
-          <Card className="stat-card">
-            <Title level={4}>Đang hoạt động</Title>
-            <div className="stat-value">{stats.active}</div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card className="stat-card">
-            <Title level={4}>Ngừng hoạt động</Title>
-            <div className="stat-value">{stats.inactive}</div>
+        <Col span={12}>
+          <Card>
+            <Statistic
+              title="Đang hoạt động"
+              value={stats.active}
+              valueStyle={{ color: '#52c41a' }}
+            />
           </Card>
         </Col>
       </Row>

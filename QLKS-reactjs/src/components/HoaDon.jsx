@@ -14,26 +14,57 @@ import {
   Descriptions,
   Typography,
   Divider,
+  AutoComplete,
+  Tag,
 } from 'antd';
 import { apiFetch } from '../auth';
 import './HoaDon.css';
 import moment from 'moment';
+import { EyeOutlined, PrinterOutlined, DownloadOutlined, MailOutlined } from '@ant-design/icons';
 
 const API_BASE_URL = 'https://localhost:7274';
+
+// Utility function to format currency
+const formatCurrency = (value) => {
+  if (!value) return '0 VNĐ';
+  return `${value.toLocaleString('vi-VN')} VNĐ`;
+};
 
 function HoaDon() {
   const [hoaDons, setHoaDons] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [search, setSearch] = useState('');
+  const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
   const [isStatusModalVisible, setIsStatusModalVisible] = useState(false);
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
-  const [selectedHoaDon, setSelectedHoaDon] = useState(null);
   const [isPhuThuModalVisible, setIsPhuThuModalVisible] = useState(false);
-  const [phuThuList, setPhuThuList] = useState([]);
-  const [editingPhuThu, setEditingPhuThu] = useState(null);
+  const [isEmailModalVisible, setIsEmailModalVisible] = useState(false);
+  const [emailForm] = Form.useForm();
+  const [selectedInvoiceForEmail, setSelectedInvoiceForEmail] = useState(null);
+  const [selectedHoaDon, setSelectedHoaDon] = useState(null);
   const [isPhuThuFormVisible, setIsPhuThuFormVisible] = useState(false);
   const [selectedMaHoaDon, setSelectedMaHoaDon] = useState(null);
+  const [searchName, setSearchName] = useState('');
+  const [searchStatus, setSearchStatus] = useState(null);
+  const [khachHangList, setKhachHangList] = useState([]);
+  const [filteredKhachHang, setFilteredKhachHang] = useState([]);
+  const [datPhongList, setDatPhongList] = useState([]);
+  const [search, setSearch] = useState('');
+  const [phuThuList, setPhuThuList] = useState([]);
+  const [editingPhuThu, setEditingPhuThu] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    const userStr = localStorage.getItem('user');
+    let user = null;
+    try {
+      user = JSON.parse(userStr);
+    } catch (e) {
+      console.error('Error parsing user info:', e);
+    }
+    return {
+      hoTen: user?.hoTen || '',
+      email: user?.email || ''
+    };
+  });
 
   const nhanVienId = localStorage.getItem('nhanVienId');
 
@@ -42,7 +73,19 @@ function HoaDon() {
     setLoading(true);
     try {
       let url = `${API_BASE_URL}/api/HoaDon?pageNumber=1&pageSize=10`;
-      if (search) url = `${API_BASE_URL}/api/HoaDon/khach-hang/${encodeURIComponent(search)}`;
+      
+      // If search is a number, treat it as status search with optional customer name
+      if (search && !isNaN(search)) {
+        url = `${API_BASE_URL}/api/HoaDon/${search}/trang-thai`;
+        // Add customer name parameter if searchName exists
+        if (searchName) {
+          url += `?tenKhachHang=${encodeURIComponent(searchName)}`;
+        }
+      }
+      // If only customer name search
+      else if (search) {
+        url = `${API_BASE_URL}/api/HoaDon/khach-hang/${encodeURIComponent(search)}`;
+      }
       
       const res = await apiFetch(url, {
         method: 'GET',
@@ -56,9 +99,32 @@ function HoaDon() {
         throw new Error(errorData.message || `Lỗi khi tải danh sách hóa đơn: ${res.status}`);
       }
 
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : (data.data?.hoaDons || data.hoaDons || data.HoaDons || []);
-      setHoaDons(list);
+      const responseData = await res.json();
+      console.log('API Response:', responseData);
+
+      // Ensure we're getting an array of invoices
+      let hoaDonArray = [];
+      
+      if (responseData && responseData.data && responseData.data.hoaDons) {
+        hoaDonArray = responseData.data.hoaDons;
+      } else if (responseData && Array.isArray(responseData)) {
+        hoaDonArray = responseData;
+      } else if (responseData && responseData.hoaDons && Array.isArray(responseData.hoaDons)) {
+        hoaDonArray = responseData.hoaDons;
+      }
+
+      // Convert any "Chua thanh toán" to "Chưa thanh toán"
+      const updatedList = Array.isArray(hoaDonArray) ? hoaDonArray.map(hoaDon => ({
+        ...hoaDon,
+        key: hoaDon.maHoaDon, // Add key for Table component
+        trangThai: hoaDon.trangThai === "Chua thanh toán" ? "Chưa thanh toán" : hoaDon.trangThai
+      })) : [];
+      
+      setHoaDons(updatedList);
+      
+      if (updatedList.length === 0) {
+        message.info('Không có hóa đơn nào.');
+      }
     } catch (e) {
       console.error('Error fetching invoices:', e);
       setHoaDons([]);
@@ -86,9 +152,44 @@ function HoaDon() {
     }
   };
 
+  // Fetch all customers
+  const fetchKhachHang = async () => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/KhachHang`);
+      if (!res.ok) {
+        throw new Error('Không thể tải danh sách khách hàng');
+      }
+      const data = await res.json();
+      const list = data.data?.khachHangs || [];
+      setKhachHangList(list.filter(kh => kh.trangThai !== 'Vô hiệu hóa'));
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      message.error('Không thể tải danh sách khách hàng');
+    }
+  };
+
+  // Fetch active bookings
+  const fetchDatPhong = async () => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/api/DatPhong`);
+      if (!res.ok) {
+        throw new Error('Không thể tải danh sách đặt phòng');
+      }
+      const data = await res.json();
+      const list = data.data?.datPhongs || [];
+      // Lọc các đặt phòng còn hiệu lực (chưa có hóa đơn)
+      setDatPhongList(list.filter(dp => dp.trangThai !== 'Đã hủy' && !dp.maHoaDon));
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+      message.error('Không thể tải danh sách đặt phòng');
+    }
+  };
+
   useEffect(() => {
     fetchHoaDons();
-  }, [search]);
+    fetchKhachHang();
+    fetchDatPhong();
+  }, []);
 
   const handleDelete = async (maHoaDon) => {
     try {
@@ -107,12 +208,14 @@ function HoaDon() {
   const handleOk = async (values) => {
     try {
       const formattedData = {
-        ...values,
+        hoTenKhachHang: values.hoTenKhachHang,
+        hoTenNhanVien: values.hoTenNhanVien,
         ngayLap: values.ngayLap?.format('YYYY-MM-DD'),
+        phuongThucThanhToan: values.phuongThucThanhToan,
+        trangThai: values.trangThai,
+        maDatPhongs: values.maDatPhongs?.map(Number) || []
       };
 
-      // Khi thêm mới
-      formattedData.idNhanVien = nhanVienId;
       console.log('Sending new invoice data:', formattedData);
 
       const response = await apiFetch(`${API_BASE_URL}/api/HoaDon`, {
@@ -145,16 +248,35 @@ function HoaDon() {
   const handleUpdateStatus = async (values) => {
     if (!selectedHoaDon) return;
     try {
-      await apiFetch(`${API_BASE_URL}/api/HoaDon/${selectedHoaDon.maHoaDon}/trang-thai`, {
+      const url = `${API_BASE_URL}/api/HoaDon/${selectedHoaDon.maHoaDon}/trang-thai${selectedHoaDon.tenKhachHang ? `?tenKhachHang=${encodeURIComponent(selectedHoaDon.tenKhachHang)}` : ''}`;
+      
+      // Convert status if needed
+      let trangThai = values.trangThai;
+      if (trangThai === "Chua thanh toán") {
+        trangThai = "Chưa thanh toán";
+      }
+      
+      const response = await apiFetch(url, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trangThai: values.trangThai }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': '*/*'
+        },
+        body: JSON.stringify({ trangThai }),
       });
-      message.success('Cập nhật trạng thái hóa đơn thành công!');
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Cập nhật trạng thái thất bại!');
+      }
+
+      const data = await response.json();
+      message.success(data.message || 'Cập nhật trạng thái hóa đơn thành công!');
       setIsStatusModalVisible(false);
       fetchHoaDons();
     } catch (e) {
-      message.error('Cập nhật trạng thái thất bại!');
+      console.error('Error updating status:', e);
+      message.error(e.message || 'Cập nhật trạng thái thất bại!');
     }
   };
 
@@ -174,47 +296,99 @@ function HoaDon() {
     }
   };
 
-  const handleExportPDF = async (maHoaDon) => {
+  const handleExportPDF = async (record) => {
     try {
-      const res = await apiFetch(`${API_BASE_URL}/api/HoaDon/${maHoaDon}/export-pdf`, {
-        method: 'GET',
+      const response = await apiFetch(`${API_BASE_URL}/api/HoaDon/${record.maHoaDon}/export-pdf`, {
+        method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'Accept': 'application/pdf'
-        }
+        },
+        body: JSON.stringify({ maHoaDon: record.maHoaDon })
       });
 
-      if (!res.ok) {
-        throw new Error('Không thể xuất PDF!');
+      if (!response.ok) {
+        throw new Error('Không thể tạo file PDF');
       }
 
-      const blob = await res.blob();
+      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `HoaDon_${maHoaDon}.pdf`;
+      a.download = `HoaDon_${record.maHoaDon}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      message.success('Xuất PDF thành công!');
-    } catch (e) {
-      message.error('Xuất PDF thất bại!');
+      
+      message.success('Đã tải xuống file PDF thành công');
+    } catch (error) {
+      console.error('Export error:', error);
+      message.error('Không thể xuất file PDF: ' + error.message);
     }
   };
 
-  const handleExportPDFEmail = async (maHoaDon) => {
+  const showEmailModal = (record) => {
+    setSelectedInvoiceForEmail(record);
+    setIsEmailModalVisible(true);
+    emailForm.resetFields();
+  };
+
+  const handleEmailPDF = async (values) => {
+    if (!selectedInvoiceForEmail) return;
+    
     try {
-      const res = await apiFetch(`${API_BASE_URL}/api/HoaDon/${maHoaDon}/export-pdf-email`, {
-        method: 'POST'
+      // Hiển thị loading message
+      message.loading({ 
+        content: 'Đang gửi email...', 
+        key: 'sendEmail',
+        duration: 0.5 // Thêm duration để message tự động đóng sau 0.5s
+      });
+      
+      const response = await apiFetch(`${API_BASE_URL}/api/HoaDon/${selectedInvoiceForEmail.maHoaDon}/export-pdf/email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          maHoaDon: selectedInvoiceForEmail.maHoaDon,
+          email: values.email
+        })
       });
 
-      if (!res.ok) {
-        throw new Error('Không thể gửi email!');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Không thể gửi email');
       }
 
-      message.success('Gửi email thành công!');
-    } catch (e) {
-      message.error('Gửi email thất bại!');
+      // Đóng modal
+      setIsEmailModalVisible(false);
+      emailForm.resetFields();
+      setSelectedInvoiceForEmail(null);
+
+      // Đợi một chút để loading message biến mất
+      setTimeout(() => {
+        // Hiển thị thông báo thành công
+        message.success({
+          content: 'Đã gửi hóa đơn qua email thành công',
+          duration: 3,
+          style: {
+            marginTop: '20vh',
+          },
+        });
+      }, 600); // Đợi 600ms sau khi loading message biến mất
+
+    } catch (error) {
+      console.error('Email error:', error);
+      // Hiển thị thông báo lỗi
+      message.error({
+        content: error.message || 'Không thể gửi email',
+        duration: 3,
+        style: {
+          marginTop: '20vh',
+        },
+      });
     }
   };
 
@@ -278,101 +452,397 @@ function HoaDon() {
     }
   };
 
+  const handleStatusChange = (value) => {
+    setSearchStatus(value);
+    setSearch(value); // Keep this for compatibility
+    fetchHoaDons();
+  };
+
+  const handleNameSearch = (value) => {
+    setSearchName(value);
+    if (searchStatus) {
+      setSearch(searchStatus); // Trigger search with current status and new name
+    } else {
+      setSearch(value); // If no status, search by name only
+    }
+  };
+
+  // Add this function to handle search
+  const handleCustomerSearch = (searchText) => {
+    if (!searchText) {
+      setFilteredKhachHang([]);
+      return;
+    }
+    
+    const filtered = khachHangList
+      .filter(customer => 
+        customer.hoTen?.toLowerCase().includes(searchText.toLowerCase())
+      )
+      .map(customer => ({
+        value: customer.hoTen,
+        label: (
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>{customer.hoTen}</span>
+            <span style={{ color: '#888' }}>{customer.soCmnd}</span>
+          </div>
+        )
+      }));
+    
+    setFilteredKhachHang(filtered);
+  };
+
+  const showModal = (record) => {
+    setSelectedHoaDon(record);
+    setIsModalVisible(true);
+  };
+
+  const handlePrint = async (record) => {
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/api/HoaDon/${record.maHoaDon}/export-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/pdf'
+        },
+        body: JSON.stringify({ maHoaDon: record.maHoaDon })
+      });
+
+      if (!response.ok) {
+        throw new Error('Không thể tạo bản in hóa đơn');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      // Open PDF in new window
+      window.open(url, '_blank');
+      
+      // Clean up
+      window.URL.revokeObjectURL(url);
+      
+      message.success('Đã mở bản in hóa đơn');
+    } catch (error) {
+      console.error('Print error:', error);
+      message.error('Không thể in hóa đơn: ' + error.message);
+    }
+  };
+
+  // Add this new component for invoice details modal
+  const InvoiceDetailsModal = ({ visible, onCancel, invoice }) => {
+    if (!invoice) return null;
+
+    return (
+      <Modal
+        title="Chi tiết hóa đơn"
+        open={visible}
+        onCancel={onCancel}
+        footer={[
+          <Button 
+            key="email" 
+            type="primary" 
+            icon={<MailOutlined />} 
+            onClick={() => showEmailModal(invoice)}
+          >
+            Gửi email
+          </Button>,
+          <Button 
+            key="download" 
+            type="primary" 
+            icon={<DownloadOutlined />} 
+            onClick={() => handleExportPDF(invoice)}
+          >
+            Tải PDF
+          </Button>,
+          <Button 
+            key="print" 
+            type="primary" 
+            icon={<PrinterOutlined />} 
+            onClick={() => handlePrint(invoice)}
+          >
+            In hóa đơn
+          </Button>,
+          <Button key="close" onClick={onCancel}>
+            Đóng
+          </Button>
+        ]}
+        width={800}
+      >
+        <Descriptions bordered column={2}>
+          <Descriptions.Item label="Mã hóa đơn" span={2}>
+            {invoice.maHoaDon}
+          </Descriptions.Item>
+          <Descriptions.Item label="Khách hàng" span={2}>
+            {invoice.tenKhachHang}
+          </Descriptions.Item>
+          <Descriptions.Item label="Nhân viên" span={2}>
+            {invoice.tenNhanVien}
+          </Descriptions.Item>
+          <Descriptions.Item label="Ngày lập">
+            {moment(invoice.ngayLap).format('DD/MM/YYYY HH:mm:ss')}
+          </Descriptions.Item>
+          <Descriptions.Item label="Trạng thái">
+            <Tag color={invoice.trangThai === 'Đã thanh toán' ? 'green' : 'red'}>
+              {invoice.trangThai}
+            </Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="Phương thức thanh toán" span={2}>
+            {invoice.phuongThucThanhToan}
+          </Descriptions.Item>
+          <Descriptions.Item label="Tổng tiền" span={2}>
+            {formatCurrency(invoice.tongTien)}
+          </Descriptions.Item>
+        </Descriptions>
+
+        {invoice.chiTietHoaDons && invoice.chiTietHoaDons.length > 0 && (
+          <>
+            <Divider orientation="left">Chi tiết đặt phòng</Divider>
+            <Table
+              dataSource={invoice.chiTietHoaDons}
+              columns={[
+                {
+                  title: 'Mã đặt phòng',
+                  dataIndex: 'maDatPhong',
+                  key: 'maDatPhong',
+                },
+                {
+                  title: 'Phòng',
+                  dataIndex: 'maPhong',
+                  key: 'maPhong',
+                },
+                {
+                  title: 'Ngày nhận',
+                  dataIndex: 'ngayNhan',
+                  key: 'ngayNhan',
+                  render: (text) => moment(text).format('DD/MM/YYYY'),
+                },
+                {
+                  title: 'Ngày trả',
+                  dataIndex: 'ngayTra',
+                  key: 'ngayTra',
+                  render: (text) => moment(text).format('DD/MM/YYYY'),
+                },
+                {
+                  title: 'Thành tiền',
+                  dataIndex: 'thanhTien',
+                  key: 'thanhTien',
+                  render: (text) => formatCurrency(text),
+                },
+              ]}
+              pagination={false}
+              rowKey="maDatPhong"
+            />
+          </>
+        )}
+
+        {invoice.chiTietDichVus && invoice.chiTietDichVus.length > 0 && (
+          <>
+            <Divider orientation="left">Chi tiết dịch vụ</Divider>
+            <Table
+              dataSource={invoice.chiTietDichVus}
+              columns={[
+                {
+                  title: 'Tên dịch vụ',
+                  dataIndex: 'tenDichVu',
+                  key: 'tenDichVu',
+                },
+                {
+                  title: 'Số lượng',
+                  dataIndex: 'soLuong',
+                  key: 'soLuong',
+                },
+                {
+                  title: 'Đơn giá',
+                  dataIndex: 'donGia',
+                  key: 'donGia',
+                  render: (text) => formatCurrency(text),
+                },
+                {
+                  title: 'Thành tiền',
+                  dataIndex: 'thanhTien',
+                  key: 'thanhTien',
+                  render: (text) => formatCurrency(text),
+                },
+              ]}
+              pagination={false}
+              rowKey="maDichVu"
+            />
+          </>
+        )}
+      </Modal>
+    );
+  };
+
   const columns = [
     {
-      title: 'Mã Hóa Đơn',
+      title: 'Mã hóa đơn',
       dataIndex: 'maHoaDon',
       key: 'maHoaDon',
+      width: '10%',
     },
     {
-      title: 'Tên Khách Hàng',
+      title: 'Tên khách hàng',
       dataIndex: 'tenKhachHang',
       key: 'tenKhachHang',
+      width: '20%',
     },
     {
-      title: 'Ngày Lập',
+      title: 'Ngày lập',
       dataIndex: 'ngayLap',
       key: 'ngayLap',
-      render: (text) => moment(text).format('DD/MM/YYYY'),
+      width: '15%',
+      render: (text) => moment(text).format('DD/MM/YYYY HH:mm:ss'),
     },
     {
-      title: 'Phương Thức Thanh Toán',
+      title: 'Tổng tiền',
+      dataIndex: 'tongTien',
+      key: 'tongTien',
+      width: '15%',
+      render: (text) => formatCurrency(text),
+    },
+    {
+      title: 'Phương thức thanh toán',
       dataIndex: 'phuongThucThanhToan',
       key: 'phuongThucThanhToan',
+      width: '20%',
     },
     {
-      title: 'Trạng Thái',
+      title: 'Trạng thái',
       dataIndex: 'trangThai',
       key: 'trangThai',
+      width: '15%',
+      render: (text) => {
+        let color = text === 'Đã thanh toán' ? 'green' : 'red';
+        return <Tag color={color}>{text}</Tag>;
+      },
     },
     {
-      title: 'Thao Tác',
+      title: 'Thao tác',
       key: 'action',
+      width: '20%',
       render: (_, record) => (
         <Space size="middle">
-          <Popconfirm
-            title="Bạn có chắc chắn muốn xóa hóa đơn này?"
-            onConfirm={() => handleDelete(record.maHoaDon)}
-            okText="Có"
-            cancelText="Không"
+          <Button
+            type="primary"
+            icon={<EyeOutlined />}
+            onClick={() => showModal(record)}
+            title="Xem chi tiết"
           >
-            <Button type="primary" danger>
-              Xóa
-            </Button>
-          </Popconfirm>
-          <Button onClick={() => handleExportPDF(record.maHoaDon)}>
-            Xuất PDF
+            Chi tiết
           </Button>
-          <Button onClick={() => handleExportPDFEmail(record.maHoaDon)}>
-            Gửi Email
+          <Button
+            type="primary"
+            icon={<DownloadOutlined />}
+            onClick={() => handleExportPDF(record)}
+            title="Tải PDF"
+          >
+            PDF
           </Button>
-          <Button onClick={() => {
-            setSelectedHoaDon(record);
-            setIsStatusModalVisible(true);
-          }}>
-            Cập Nhật Trạng Thái
+          <Button
+            type="primary"
+            icon={<MailOutlined />}
+            onClick={() => showEmailModal(record)}
+            title="Gửi qua email"
+          >
+            Email
           </Button>
-          <Button onClick={() => {
-            setSelectedHoaDon(record);
-            setIsPaymentModalVisible(true);
-          }}>
-            Cập Nhật Thanh Toán
-          </Button>
-          <Button onClick={() => showPhuThuModal(record)}>
-            Phụ Thu
-          </Button>
+          <Button
+            type="primary"
+            icon={<PrinterOutlined />}
+            onClick={() => handlePrint(record)}
+            title="In hóa đơn"
+          />
         </Space>
       ),
     },
   ];
 
+  // Update the status modal content
+  const StatusModal = ({ visible, onCancel }) => {
+    const [form] = Form.useForm();
+
+    useEffect(() => {
+      if (visible && selectedHoaDon) {
+        form.setFieldsValue({
+          trangThai: selectedHoaDon.trangThai
+        });
+      }
+    }, [visible, selectedHoaDon, form]);
+
+    return (
+      <Modal
+        title="Cập nhật trạng thái"
+        visible={visible}
+        onCancel={onCancel}
+        footer={null}
+      >
+        <Form
+          form={form}
+          onFinish={handleUpdateStatus}
+          layout="vertical"
+        >
+          <Form.Item
+            name="trangThai"
+            label="Trạng thái"
+            rules={[{ required: true, message: 'Vui lòng chọn trạng thái!' }]}
+          >
+            <Select>
+              <Select.Option value="Chưa Thanh Toán">Chưa thanh toán</Select.Option>
+              <Select.Option value="Đã Thanh Toán">Đã thanh toán</Select.Option>
+              <Select.Option value="Đã Hủy">Đã hủy</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit">
+              Cập nhật
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+    );
+  };
+
   return (
     <div className="hoa-don-container">
       <div className="hoa-don-header">
         <h2>Quản lý hóa đơn</h2>
-        <Space>
+        <div style={{ marginBottom: '16px', display: 'flex', gap: '16px', alignItems: 'center' }}>
           <Input.Search
             placeholder="Tìm kiếm theo tên khách hàng"
-            onSearch={value => setSearch(value)}
+            value={searchName}
+            onChange={(e) => handleNameSearch(e.target.value)}
             style={{ width: 300 }}
           />
+          <Select
+            placeholder="Lọc theo trạng thái"
+            style={{ width: 200 }}
+            onChange={handleStatusChange}
+            value={searchStatus}
+            allowClear
+          >
+            <Select.Option value="0">Chưa thanh toán</Select.Option>
+            <Select.Option value="1">Đã thanh toán</Select.Option>
+            <Select.Option value="2">Đã hủy</Select.Option>
+          </Select>
           <Button type="primary" onClick={showAddModal}>
             Thêm hóa đơn
           </Button>
-        </Space>
+        </div>
       </div>
 
       <Table
         columns={columns}
-        dataSource={hoaDons}
-        rowKey="maHoaDon"
+        dataSource={hoaDons || []}
+        rowKey={(record) => record.maHoaDon}
         loading={loading}
         pagination={{
-          total: hoaDons.length,
+          total: hoaDons?.length || 0,
           pageSize: 10,
           showSizeChanger: true,
           showQuickJumper: true,
           showTotal: (total) => `Tổng số ${total} hóa đơn`
+        }}
+        locale={{
+          emptyText: 'Không có dữ liệu'
         }}
       />
 
@@ -382,18 +852,68 @@ function HoaDon() {
         open={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
         footer={null}
+        width={800}
       >
         <Form
           layout="vertical"
           onFinish={handleOk}
+          initialValues={{
+            hoTenNhanVien: currentUser.hoTen,
+            ngayLap: moment(),
+            phuongThucThanhToan: 'Tiền mặt',
+            trangThai: 'Chưa thanh toán'
+          }}
         >
           <Form.Item
             label="Tên khách hàng"
-            name="tenKhachHang"
-            rules={[{ required: true, message: 'Vui lòng nhập tên khách hàng!' }]}
+            name="hoTenKhachHang"
+            rules={[{ required: true, message: 'Vui lòng chọn khách hàng!' }]}
           >
-            <Input />
+            <Select
+              showSearch
+              placeholder="Chọn khách hàng"
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={khachHangList.map(kh => ({
+                value: kh.hoTen,
+                label: `${kh.hoTen} - ${kh.soCmnd || 'Chưa có CMND'}`,
+              }))}
+            />
           </Form.Item>
+
+          <Form.Item
+            label="Tên nhân viên"
+            name="hoTenNhanVien"
+          >
+            <Input 
+              defaultValue={currentUser.hoTen}
+              disabled 
+              style={{ backgroundColor: '#f5f5f5', color: '#000' }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Mã đặt phòng"
+            name="maDatPhongs"
+            rules={[{ required: true, message: 'Vui lòng chọn ít nhất một mã đặt phòng!' }]}
+          >
+            <Select
+              mode="multiple"
+              placeholder="Chọn mã đặt phòng"
+              style={{ width: '100%' }}
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={datPhongList.map(dp => ({
+                value: dp.maDatPhong,
+                label: `Mã DP: ${dp.maDatPhong} - Phòng: ${dp.maPhong} - KH: ${dp.tenKhachHang}`,
+              }))}
+            />
+          </Form.Item>
+
           <Form.Item
             label="Ngày lập"
             name="ngayLap"
@@ -401,10 +921,11 @@ function HoaDon() {
           >
             <DatePicker
               style={{ width: '100%' }}
-              format="DD/MM/YYYY"
+              format="YYYY-MM-DD"
               disabledDate={(current) => current && current > moment().endOf('day')}
             />
           </Form.Item>
+
           <Form.Item
             label="Phương thức thanh toán"
             name="phuongThucThanhToan"
@@ -416,37 +937,7 @@ function HoaDon() {
               <Select.Option value="Thẻ tín dụng">Thẻ tín dụng</Select.Option>
             </Select>
           </Form.Item>
-          <Form.Item
-            label="Trạng thái"
-            name="trangThai"
-            rules={[{ required: true, message: 'Vui lòng chọn trạng thái!' }]}
-          >
-            <Select>
-              <Select.Option value="Chưa thanh toán">Chưa thanh toán</Select.Option>
-              <Select.Option value="Đã thanh toán trước">Đã thanh toán trước</Select.Option>
-              <Select.Option value="Đã thanh toán">Đã thanh toán</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit">
-              Thêm mới
-            </Button>
-          </Form.Item>
-        </Form>
-      </Modal>
 
-      {/* Status Update Modal */}
-      <Modal
-        title="Cập nhật trạng thái"
-        open={isStatusModalVisible}
-        onCancel={() => setIsStatusModalVisible(false)}
-        footer={null}
-      >
-        <Form
-          layout="vertical"
-          onFinish={handleUpdateStatus}
-          initialValues={{ trangThai: selectedHoaDon?.trangThai }}
-        >
           <Form.Item
             label="Trạng thái"
             name="trangThai"
@@ -454,14 +945,20 @@ function HoaDon() {
           >
             <Select>
               <Select.Option value="Chưa thanh toán">Chưa thanh toán</Select.Option>
-              <Select.Option value="Đã thanh toán trước">Đã thanh toán trước</Select.Option>
               <Select.Option value="Đã thanh toán">Đã thanh toán</Select.Option>
+              <Select.Option value="Đã hủy">Đã hủy</Select.Option>
             </Select>
           </Form.Item>
+
           <Form.Item>
-            <Button type="primary" htmlType="submit">
-              Cập nhật
-            </Button>
+            <Space>
+              <Button type="primary" htmlType="submit">
+                Thêm mới
+              </Button>
+              <Button onClick={() => setIsModalVisible(false)}>
+                Hủy
+              </Button>
+            </Space>
           </Form.Item>
         </Form>
       </Modal>
@@ -593,6 +1090,60 @@ function HoaDon() {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* Status Update Modal */}
+      <StatusModal
+        visible={isStatusModalVisible}
+        onCancel={() => setIsStatusModalVisible(false)}
+      />
+
+      {/* Email Modal */}
+      <Modal
+        title="Gửi hóa đơn qua Email"
+        open={isEmailModalVisible}
+        onCancel={() => {
+          setIsEmailModalVisible(false);
+          emailForm.resetFields();
+        }}
+        footer={null}
+      >
+        <Form
+          form={emailForm}
+          layout="vertical"
+          onFinish={handleEmailPDF}
+        >
+          <Form.Item
+            name="email"
+            label="Email"
+            rules={[
+              { required: true, message: 'Vui lòng nhập email!' },
+              { type: 'email', message: 'Email không hợp lệ!' }
+            ]}
+          >
+            <Input placeholder="Nhập địa chỉ email" />
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit">
+                Gửi
+              </Button>
+              <Button onClick={() => {
+                setIsEmailModalVisible(false);
+                emailForm.resetFields();
+              }}>
+                Hủy
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Add the InvoiceDetailsModal */}
+      <InvoiceDetailsModal
+        visible={isModalVisible}
+        onCancel={() => setIsModalVisible(false)}
+        invoice={selectedHoaDon}
+      />
     </div>
   );
 }

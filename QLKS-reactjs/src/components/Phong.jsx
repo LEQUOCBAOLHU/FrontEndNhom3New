@@ -17,7 +17,6 @@ const COLORS = ['#00C49F', '#FF8042', '#FFBB28'];
 
 function Phong() {
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isStatusModalVisible, setIsStatusModalVisible] = useState(false);
   const [phongs, setPhongs] = useState([]);
   const [selectedPhong, setSelectedPhong] = useState(null);
   const [roomStats, setRoomStats] = useState({
@@ -72,7 +71,6 @@ function Phong() {
   const fetchAllRooms = async () => {
     setLoading(true);
     try {
-      // Thêm cache-busting parameter để đảm bảo dữ liệu luôn mới
       const timestamp = new Date().getTime();
       const response = await apiFetch(`https://qlks-0dvh.onrender.com/api/Phong?pageNumber=1&pageSize=999&t=${timestamp}`);
       if (response.ok) {
@@ -80,14 +78,31 @@ function Phong() {
         const list = Array.isArray(data) ? data : (data.data?.phongs || []);
         const mapped = list.map(room => ({
           ...room,
-          key: room.maPhong, // Thêm key cho React
+          key: room.maPhong,
           trangThai: room.trangThai || room.tinhTrang || '',
           tenPhong: room.tenPhong || room.TenPhong || '',
           maPhong: room.maPhong || room.MaPhong || '',
           tenLoaiPhong: room.tenLoaiPhong || room.TenLoaiPhong || ''
         }));
+        
+        // Cập nhật cả hai state
         setAllPhongs(mapped);
-        setFilteredPhongs(mapped); // Ban đầu hiển thị tất cả
+        setFilteredPhongs(mapped);
+        
+        // Cập nhật lại thống kê
+        const stats = {
+          'Trống': 0,
+          'Đang sử dụng': 0,
+          'Bảo trì': 0
+        };
+        
+        mapped.forEach(room => {
+          if (room.trangThai in stats) {
+            stats[room.trangThai]++;
+          }
+        });
+        
+        setRoomStats(stats);
       }
     } catch (error) {
       console.error('Error fetching all rooms:', error);
@@ -208,21 +223,59 @@ function Phong() {
       title: 'Trạng thái',
       dataIndex: 'trangThai',
       key: 'trangThai',
+      render: (text, record) => (
+        <Select
+          value={text}
+          style={{ width: 130 }}
+          onChange={async (newTrangThai) => {
+            try {
+              const API_URL = process.env.REACT_APP_API_URL || 'https://localhost:7274';
+              const response = await apiFetch(`${API_URL}/api/Phong/${record.maPhong}/trang-thai?trangThai=${encodeURIComponent(newTrangThai)}`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': '*/*'
+                }
+              });
+              
+              if (response.ok) {
+                message.success('Cập nhật trạng thái thành công');
+                // Cập nhật local state
+                const updatedPhongs = allPhongs.map(p => 
+                  p.maPhong === record.maPhong 
+                    ? { ...p, trangThai: newTrangThai }
+                    : p
+                );
+                setAllPhongs(updatedPhongs);
+                setFilteredPhongs(updatedPhongs);
+
+                // Cập nhật thống kê
+                const newStats = { ...roomStats };
+                newStats[text] = Math.max((newStats[text] || 0) - 1, 0);
+                newStats[newTrangThai] = (newStats[newTrangThai] || 0) + 1;
+                setRoomStats(newStats);
+              } else {
+                const errorData = await response.json();
+                message.error(errorData.message || 'Cập nhật trạng thái thất bại');
+              }
+            } catch (error) {
+              message.error('Đã có lỗi xảy ra khi cập nhật trạng thái');
+            }
+          }}
+        >
+          {['Trống', 'Đang sử dụng', 'Bảo trì'].map(trangThai => (
+            <Option key={trangThai} value={trangThai}>
+              <Tag color={getTrangThaiColor(trangThai)}>{trangThai}</Tag>
+            </Option>
+          ))}
+        </Select>
+      ),
       filters: [
         { text: 'Đang sử dụng', value: 'Đang sử dụng' },
-        { text: 'Đã đặt', value: 'Đã đặt' },
         { text: 'Bảo trì', value: 'Bảo trì' },
         { text: 'Trống', value: 'Trống' },
       ],
       onFilter: (value, record) => record.trangThai.includes(value),
-      render: (text) => {
-        let color = 'default';
-        if (text === 'Đang sử dụng') color = 'red';
-        else if (text === 'Đã đặt') color = 'blue';
-        else if (text === 'bảo trì') color = 'gold';
-        else if (text === 'Trống') color = 'green';
-        return <Tag color={color}>{text}</Tag>;
-      },
     },
     {
       title: 'Loại phòng',
@@ -268,26 +321,42 @@ function Phong() {
     },
   ];
 
-  const handleUpdateStatus = async (values) => {
+  const handleUpdateStatus = async (trangThai) => {
     if (!selectedPhong) return;
     try {
-      const response = await apiFetch(`https://qlks-0dvh.onrender.com/api/Phong/${selectedPhong.maPhong}/trang-thai`, {
+      const API_URL = process.env.REACT_APP_API_URL || 'https://localhost:7274';
+      const response = await apiFetch(`${API_URL}/api/Phong/${selectedPhong.maPhong}/trang-thai?trangThai=${encodeURIComponent(trangThai)}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trangThai: values.trangThai })
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': '*/*'
+        }
       });
 
       if (response.ok) {
+        const updatedPhongs = allPhongs.map(p => 
+          p.maPhong === selectedPhong.maPhong 
+            ? { ...p, trangThai: trangThai }
+            : p
+        );
+        setAllPhongs(updatedPhongs);
+        setFilteredPhongs(updatedPhongs);
+
+        const newStats = { ...roomStats };
+        if (selectedPhong.trangThai !== trangThai) {
+          newStats[selectedPhong.trangThai] = Math.max((newStats[selectedPhong.trangThai] || 0) - 1, 0);
+          newStats[trangThai] = (newStats[trangThai] || 0) + 1;
+          setRoomStats(newStats);
+        }
+
         message.success('Cập nhật trạng thái phòng thành công!');
-        await fetchAllRooms();
-        await fetchRoomStats();
-        setIsStatusModalVisible(false);
+        setIsModalVisible(false);
       } else {
         const errorData = await response.json();
-        message.error(errorData.message || 'Cập nhật trạng thái thất bại.');
+        throw new Error(errorData.message || 'Cập nhật trạng thái thất bại.');
       }
     } catch (error) {
-      message.error('Đã có lỗi xảy ra khi cố gắng cập nhật trạng thái.');
+      message.error(error.message || 'Đã có lỗi xảy ra khi cố gắng cập nhật trạng thái.');
       console.error("Update status error:", error);
     }
   };
@@ -335,7 +404,6 @@ function Phong() {
       const data = await response.json();
       if(response.ok) {
         setSelectedPhong(data.data);
-        setIsStatusModalVisible(true);
       } else {
         message.error(data.message || "Không thể lấy chi tiết phòng.");
       }
@@ -346,7 +414,6 @@ function Phong() {
 
   const handleCancel = () => {
     setIsModalVisible(false);
-    setIsStatusModalVisible(false);
     setSelectedPhong(null);
     form.resetFields();
     setEditingId(null);
@@ -358,6 +425,19 @@ function Phong() {
       let result = {};
 
       if (editingId) {
+        // Nếu chỉ cập nhật trạng thái
+        if (Object.keys(values).length === 1 && values.trangThai) {
+          const response = await apiFetch(`https://qlks-0dvh.onrender.com/api/Phong/${editingId}/trang-thai?trangThai=${encodeURIComponent(values.trangThai)}`, {
+            method: 'PUT'
+          });
+          if (response.ok) {
+            result = { success: true, message: 'Cập nhật trạng thái phòng thành công!' };
+          } else {
+            const errorData = await response.json();
+            result = { success: false, message: errorData.message || 'Cập nhật trạng thái thất bại.' };
+          }
+        } else {
+          // Nếu cập nhật thông tin khác
         const response = await apiFetch(`https://qlks-0dvh.onrender.com/api/Phong/${editingId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -368,6 +448,7 @@ function Phong() {
         } else {
           const errorData = await response.json();
           result = { success: false, message: errorData.message || 'Cập nhật phòng thất bại.' };
+          }
         }
       } else {
         result = await handleAddRoom(values);
@@ -375,35 +456,13 @@ function Phong() {
 
       if (result.success) {
         message.success(result.message);
-        
-        if (editingId) {
-          // --- Optimistic UI Update ---
-          // 1. Cập nhật bảng dữ liệu
-          const oldPhong = allPhongs.find(p => p.maPhong === editingId);
-          const updatedPhongs = allPhongs.map(p => 
-            p.maPhong === editingId ? { ...p, ...values } : p
-          );
-          setAllPhongs(updatedPhongs);
-
-          // 2. Cập nhật các thẻ thống kê nếu trạng thái thay đổi
-          if (oldPhong && oldPhong.trangThai !== values.trangThai) {
-            const newStats = { ...roomStats };
-            newStats[oldPhong.trangThai] = (newStats[oldPhong.trangThai] || 1) - 1;
-            newStats[values.trangThai] = (newStats[values.trangThai] || 0) + 1;
-            setRoomStats(newStats);
-          }
-        } else {
-          // Nếu là thêm mới, cần fetch lại để có dữ liệu đầy đủ
           await fetchAllRooms();
           await fetchRoomStats();
-        }
-        
         setIsModalVisible(false);
         form.resetFields();
       } else {
         message.error(result.message);
       }
-
     } catch (info) {
       console.log('Validate Failed:', info);
     }
@@ -637,44 +696,19 @@ function Phong() {
         />
       </Card>
 
-
       {/* Modals */}
       <Modal
-        title="Cập nhật trạng thái phòng"
-        open={isStatusModalVisible}
-        onCancel={() => setIsStatusModalVisible(false)}
-        destroyOnClose
-      >
-        <Form layout="vertical" onFinish={handleUpdateStatus}>
-          <Form.Item label="Trạng thái" name="trangThai" rules={[{ required: true, message: 'Chọn trạng thái!' }]}> 
-            <Select>
-              <Option value="Trống">Trống</Option>
-              <Option value="Đang sử dụng">Đang sử dụng</Option>
-              <Option value="Bảo trì">Bảo trì</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item> <Button type="primary" htmlType="submit">Cập nhật</Button> </Form.Item>
-        </Form>
-      </Modal>
-
-      <Modal
-        title={editingId ? "Sửa phòng" : "Thêm phòng mới"}
+        title="Sửa phòng"
         open={isModalVisible}
         onCancel={handleCancel}
         onOk={handleSubmit}
         destroyOnClose
-        footer={[
-          <Button key="back" onClick={handleCancel}>
-            Hủy
-          </Button>,
-          <Button key="submit" type="primary" loading={loading} onClick={handleSubmit}>
-            {editingId ? "Cập nhật" : "Thêm mới"}
-          </Button>,
-        ]}
+        footer={null}
       >
         <Form
           form={form}
           layout="vertical"
+          onFinish={handleSubmit}
         >
           <Form.Item
             name="maPhong"
@@ -704,21 +738,20 @@ function Phong() {
             </Select>
           </Form.Item>
           <Form.Item
-            name="trangThai"
-            label="Trạng thái"
-            rules={[{ required: true, message: 'Vui lòng chọn trạng thái!' }]}
-          >
-            <Select placeholder="Chọn trạng thái">
-              <Option value="Trống">Trống</Option>
-              <Option value="Đang sử dụng">Đang sử dụng</Option>
-              <Option value="Bảo trì">Bảo trì</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item
             name="ghiChu"
             label="Ghi chú"
           >
             <Input.TextArea />
+          </Form.Item>
+          <Form.Item style={{ marginBottom: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Button onClick={handleCancel}>
+                Hủy
+              </Button>
+              <Button type="primary" htmlType="submit" loading={loading}>
+                {editingId ? "Cập nhật" : "Thêm mới"}
+              </Button>
+            </div>
           </Form.Item>
         </Form>
       </Modal>
@@ -729,56 +762,132 @@ function Phong() {
         onCancel={() => setSelectedPhong(null)}
         destroyOnClose
         width={800}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Button onClick={() => setSelectedPhong(null)}>
+              Cancel
+            </Button>
+            <Button type="primary" onClick={() => setSelectedPhong(null)}>
+              OK
+            </Button>
+          </div>
+        }
+        bodyStyle={{ padding: '20px' }}
       >
         {selectedPhong && (
           <div>
-            <h3>Thông tin phòng</h3>
-            <p><strong>Mã phòng:</strong> {selectedPhong.maPhong}</p>
-            <p><strong>Tên phòng:</strong> {selectedPhong.tenPhong}</p>
-            <p><strong>Loại phòng:</strong> {selectedPhong.tenLoaiPhong}</p>
-            <p><strong>Trạng thái:</strong> <Tag color={getTrangThaiColor(selectedPhong.trangThai)}>{selectedPhong.trangThai}</Tag></p>
-            <p><strong>Ghi chú:</strong> {selectedPhong.ghiChu || '-'}</p>
-
-            <h3>Thông tin loại phòng</h3>
-            <p><strong>Số người tối đa:</strong> {selectedPhong.soNguoiToiDa}</p>
-            <p><strong>Giá cơ bản:</strong> {selectedPhong.giaCoBan?.toLocaleString('vi-VN')} VNĐ</p>
+            <Row gutter={[16, 16]}>
+              <Col span={12}>
+                <div className="room-detail-section">
+                  <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>Thông tin phòng</h3>
+                  <div className="detail-item">
+                    <span className="label">Mã phòng:</span>
+                    <span className="value">{selectedPhong.maPhong}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="label">Tên phòng:</span>
+                    <span className="value">{selectedPhong.tenPhong}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="label">Loại phòng:</span>
+                    <span className="value">{selectedPhong.tenLoaiPhong}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="label">Trạng thái:</span>
+                    <Tag color={getTrangThaiColor(selectedPhong.trangThai)}>{selectedPhong.trangThai}</Tag>
+                  </div>
+                  <div className="detail-item">
+                    <span className="label">Ghi chú:</span>
+                    <span className="value">{selectedPhong.ghiChu || '-'}</span>
+                  </div>
+                </div>
+              </Col>
+              <Col span={12}>
+                <div className="room-detail-section">
+                  <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>Thông tin loại phòng</h3>
+                  <div className="detail-item">
+                    <span className="label">Số người tối đa:</span>
+                    <span className="value">{selectedPhong.soNguoiToiDa}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="label">Giá cơ bản:</span>
+                    <span className="value">{selectedPhong.giaCoBan?.toLocaleString('vi-VN')} VNĐ</span>
+                  </div>
+                </div>
+              </Col>
+            </Row>
 
             {selectedPhong.danhSachDatPhong && selectedPhong.danhSachDatPhong.length > 0 && (
-              <>
-                <h3>Lịch sử đặt phòng</h3>
+              <div style={{ marginTop: 24 }}>
+                <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>Lịch sử đặt phòng</h3>
                 <Table
                   dataSource={selectedPhong.danhSachDatPhong}
                   columns={[
                     {
                       title: 'Mã đặt phòng',
                       dataIndex: 'maDatPhong',
-                      key: 'maDatPhong'
+                      key: 'maDatPhong',
+                      width: '25%'
                     },
                     {
                       title: 'Ngày nhận phòng',
                       dataIndex: 'ngayNhanPhong',
                       key: 'ngayNhanPhong',
+                      width: '30%',
                       render: (text) => new Date(text).toLocaleString('vi-VN')
                     },
                     {
                       title: 'Ngày trả phòng',
                       dataIndex: 'ngayTraPhong',
                       key: 'ngayTraPhong',
+                      width: '30%',
                       render: (text) => new Date(text).toLocaleString('vi-VN')
                     },
                     {
                       title: 'Trạng thái',
                       dataIndex: 'trangThai',
-                      key: 'trangThai'
+                      key: 'trangThai',
+                      width: '15%'
                     }
                   ]}
                   pagination={false}
+                  size="small"
+                  scroll={{ y: 200 }}
+                  style={{ width: '100%' }}
                 />
-              </>
+              </div>
             )}
           </div>
         )}
       </Modal>
+
+      <style jsx>{`
+        .room-detail-section {
+          background: #f8f9fa;
+          padding: 16px;
+          border-radius: 8px;
+          height: 100%;
+        }
+        .detail-item {
+          display: flex;
+          margin-bottom: 12px;
+          align-items: center;
+        }
+        .detail-item:last-child {
+          margin-bottom: 0;
+        }
+        .label {
+          font-weight: 500;
+          min-width: 110px;
+          width: 110px;
+          color: #666;
+        }
+        .value {
+          flex: 1;
+          color: #333;
+          word-break: break-word;
+        }
+      `}</style>
     </div>
   );
 }

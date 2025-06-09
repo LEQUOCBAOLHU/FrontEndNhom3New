@@ -116,13 +116,6 @@ const LoginRegister = () => {
             {loading ? 'Đang xử lý...' : isLogin ? 'Đăng Nhập' : 'Đăng Ký'}
           </Button>
         </form>
-        <Button
-          className="auth-link"
-          onClick={() => setIsLogin(!isLogin)}
-          sx={{ textTransform: 'none', mt: 2 }}
-        >
-          {isLogin ? 'Chưa có tài khoản? Đăng ký ngay' : 'Đã có tài khoản? Đăng nhập'}
-        </Button>
       </motion.div>
     </div>
   );

@@ -315,6 +315,24 @@
   }
 }
 
-[data-theme="dark"] .dich-vu-title {
-  color: #fff !important;
+[data-theme="dark"] .dichvu-container {
+  background: var(--bg-main, #0f172a);
+  color: var(--text-primary, #f8fafc);
+}
+
+[data-theme="dark"] .service-card {
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .header-section {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .header-section h1 {
+  background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.8) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: unset;
 }

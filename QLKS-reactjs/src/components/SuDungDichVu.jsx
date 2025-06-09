@@ -1,358 +1,428 @@
-import React, { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, Space, Popconfirm, message, Select, DatePicker, InputNumber, Tooltip } from 'antd';
+import React, { useState, useEffect } from 'react';
+import {
+  Table,
+  Button,
+  Modal,
+  Form,
+  Input,
+  InputNumber,
+  Space,
+  Popconfirm,
+  message,
+  DatePicker,
+  Select,
+  Typography,
+  Card,
+} from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
 import { apiFetch } from '../auth';
-import './SuDungDichVu.css';
 import dayjs from 'dayjs';
+import './SuDungDichVu.css';
+
+const { Title } = Typography;
+const { Option } = Select;
+
+const API_BASE_URL = 'https://localhost:7274/api';
 
 function SuDungDichVu() {
-  const [data, setData] = useState([]);
+  const [suDungDichVus, setSuDungDichVus] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editing, setEditing] = useState(null);
+  const [editingRecord, setEditingRecord] = useState(null);
   const [datPhongs, setDatPhongs] = useState([]);
   const [dichVus, setDichVus] = useState([]);
   const [form] = Form.useForm();
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  });
 
-  // Lấy tên dịch vụ từ mã dịch vụ
-  const getTenDichVu = (maDichVu) => {
-    const dv = dichVus.find(dv => dv.maDichVu === maDichVu);
-    return dv ? dv.tenDichVu : maDichVu;
-  };
-  // Lấy đơn giá dịch vụ từ mã dịch vụ
-  const getDonGiaDichVu = (maDichVu) => {
-    const dv = dichVus.find(dv => dv.maDichVu === maDichVu);
-    return dv ? dv.donGia : null;
-  };
-  // Lấy tên khách hàng từ mã đặt phòng
-  const getTenKhachHang = (maDatPhong) => {
-    const dp = datPhongs.find(dp => dp.maDatPhong === maDatPhong);
-    return dp ? dp.tenKhachHang : maDatPhong;
-  };
-
-  // Đổi endpoint API Sử dụng dịch vụ sang API mới
-  const SDDV_API = 'https://qlks-0dvh.onrender.com/api/SuDungDichVu';
-
-  const fetchData = async () => {
+  // Fetch service usage records
+  const fetchSuDungDichVus = async (page = 1, pageSize = 10) => {
     setLoading(true);
     try {
-      const res = await apiFetch(SDDV_API);
-      const resData = await res.json();
-      if (resData.data?.suDungDichVus) {
-        setData(resData.data.suDungDichVus);
-      } else {
-        setData([]);
-        console.error('Unexpected response format:', resData);
+      const response = await apiFetch(`${API_BASE_URL}/SuDungDichVu?pageNumber=${page}&pageSize=${pageSize}`);
+      const data = await response.json();
+      
+      // Handle different response structures
+      let suDungDichVuList = [];
+      if (Array.isArray(data)) {
+        suDungDichVuList = data;
+      } else if (data.data?.suDungDichVus) {
+        suDungDichVuList = data.data.suDungDichVus;
+      } else if (data.suDungDichVus) {
+        suDungDichVuList = data.suDungDichVus;
+      } else if (data.data) {
+        suDungDichVuList = Array.isArray(data.data) ? data.data : [];
       }
-    } catch (e) {
-      console.error('Error fetching data:', e);
-      setData([]);
-      message.error('Không thể tải dữ liệu sử dụng dịch vụ');
+
+      // Ensure each record has a unique key
+      const processedList = suDungDichVuList.map(item => ({
+        ...item,
+        key: item.maSuDung // Add key property for Table
+      }));
+
+      setSuDungDichVus(processedList);
+      setPagination({
+        ...pagination,
+        current: page,
+        total: data.totalItems || processedList.length,
+      });
+
+      if (processedList.length === 0) {
+        message.info('Không có dữ liệu sử dụng dịch vụ.');
+      }
+    } catch (error) {
+      console.error('Error fetching service usage records:', error);
+      message.error('Không thể tải danh sách sử dụng dịch vụ');
+      setSuDungDichVus([]);
     } finally {
       setLoading(false);
     }
   };
 
+  // Fetch booking records
   const fetchDatPhongs = async () => {
     try {
-      const res = await apiFetch('https://qlks-0dvh.onrender.com/api/DatPhong?pageNumber=1&pageSize=100');
-      const resData = await res.json();
-      if (resData.data?.datPhongs) {
-        setDatPhongs(resData.data.datPhongs);
-      } else {
-        setDatPhongs([]);
-        console.error('Unexpected response format for bookings:', resData);
+      const response = await apiFetch(`${API_BASE_URL}/DatPhong`);
+      const data = await response.json();
+      
+      // Handle different response structures
+      let datPhongList = [];
+      if (Array.isArray(data)) {
+        datPhongList = data;
+      } else if (data.data?.datPhongs) {
+        datPhongList = data.data.datPhongs;
+      } else if (data.datPhongs) {
+        datPhongList = data.datPhongs;
+      } else if (data.data) {
+        datPhongList = Array.isArray(data.data) ? data.data : [];
       }
-    } catch (e) {
-      console.error('Error fetching bookings:', e);
-      setDatPhongs([]);
+
+      // Filter only active bookings (not cancelled and not checked out)
+      const activeBookings = datPhongList.filter(dp => 
+        dp.trangThai !== 'Đã hủy' && 
+        dp.trangThai !== 'Đã trả phòng'
+      );
+
+      console.log('Active bookings:', activeBookings);
+      setDatPhongs(activeBookings);
+    } catch (error) {
+      console.error('Error fetching booking records:', error);
       message.error('Không thể tải danh sách đặt phòng');
+      setDatPhongs([]);
     }
   };
 
+  // Fetch services
   const fetchDichVus = async () => {
     try {
-      const res = await apiFetch('https://qlks-0dvh.onrender.com/api/DichVu?pageNumber=1&pageSize=100');
-      const resData = await res.json();
-      if (resData.data?.dichVus) {
-        setDichVus(resData.data.dichVus);
-      } else {
-        setDichVus([]);
-        console.error('Unexpected response format for services:', resData);
+      const response = await apiFetch(`${API_BASE_URL}/DichVu`);
+      const data = await response.json();
+      
+      // Handle different response structures
+      let dichVuList = [];
+      if (Array.isArray(data)) {
+        dichVuList = data;
+      } else if (data.data?.dichVus) {
+        dichVuList = data.data.dichVus;
+      } else if (data.dichVus) {
+        dichVuList = data.dichVus;
+      } else if (data.data) {
+        dichVuList = Array.isArray(data.data) ? data.data : [];
       }
-    } catch (e) {
-      console.error('Error fetching services:', e);
-      setDichVus([]);
+      
+      setDichVus(dichVuList);
+    } catch (error) {
+      console.error('Error fetching services:', error);
       message.error('Không thể tải danh sách dịch vụ');
+      setDichVus([]);
     }
-  };
-
-  // Đồng bộ dữ liệu khi vào trang hoặc sau khi thao tác
-  const syncAll = async () => {
-    await Promise.all([fetchData(), fetchDatPhongs(), fetchDichVus()]);
   };
 
   useEffect(() => {
-    syncAll();
+    fetchSuDungDichVus();
+    fetchDatPhongs();
+    fetchDichVus();
   }, []);
 
-  const handleDelete = async (maSuDung) => {
-    try {
-      const res = await apiFetch(`${SDDV_API}/${maSuDung}`, { 
-        method: 'DELETE' 
+  const handleTableChange = (newPagination) => {
+    fetchSuDungDichVus(newPagination.current, newPagination.pageSize);
+  };
+
+  const showModal = (record = null) => {
+    setEditingRecord(record);
+    if (record) {
+      form.setFieldsValue({
+        ...record,
+        ngaySuDung: record.ngaySuDung ? dayjs(record.ngaySuDung) : null,
+        ngayKetThuc: record.ngayKetThuc ? dayjs(record.ngayKetThuc) : null,
       });
-      if (res.ok) {
-        message.success('Xóa thành công!');
-        syncAll();
+    } else {
+      form.resetFields();
+    }
+    setIsModalVisible(true);
+  };
+
+  const handleCancel = () => {
+    setIsModalVisible(false);
+    form.resetFields();
+    setEditingRecord(null);
+  };
+
+  const handleSubmit = async (values) => {
+    try {
+      const url = editingRecord
+        ? `${API_BASE_URL}/SuDungDichVu/${editingRecord.maSuDung}`
+        : `${API_BASE_URL}/SuDungDichVu`;
+      
+      const method = editingRecord ? 'PUT' : 'POST';
+      
+      const formattedValues = {
+        ...values,
+        ngaySuDung: values.ngaySuDung?.format('YYYY-MM-DD'),
+        ngayKetThuc: values.ngayKetThuc?.format('YYYY-MM-DD'),
+      };
+
+      const response = await apiFetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formattedValues),
+      });
+
+      if (response.ok) {
+        message.success(
+          editingRecord
+            ? 'Cập nhật sử dụng dịch vụ thành công!'
+            : 'Thêm sử dụng dịch vụ mới thành công!'
+        );
+        handleCancel();
+        fetchSuDungDichVus(pagination.current, pagination.pageSize);
       } else {
-        const errorData = await res.json();
-        message.error(errorData.message || 'Xóa thất bại!');
+        throw new Error('Failed to save service usage');
       }
-    } catch (e) {
-      console.error('Error deleting:', e);
-      message.error('Xóa thất bại!');
+    } catch (error) {
+      console.error('Error saving service usage:', error);
+      message.error('Không thể lưu thông tin sử dụng dịch vụ');
     }
   };
 
-  const showEditModal = (record) => {
-    setEditing(record);
-    form.setFieldsValue({
-      ...record,
-      ngaySuDung: record.ngaySuDung ? dayjs(record.ngaySuDung) : undefined,
-      ngayKetThuc: record.ngayKetThuc ? dayjs(record.ngayKetThuc) : undefined,
-    });
-    setIsModalVisible(true);
-  };
-
-  const showAddModal = () => {
-    setEditing(null);
-    form.resetFields();
-    setIsModalVisible(true);
-  };
-
-  const handleOk = async (values) => {
+  const handleDelete = async (maSuDung) => {
     try {
-      const payload = {
-        ...values,
-        soLuong: Number(values.soLuong),
-        ngaySuDung: values.ngaySuDung ? values.ngaySuDung.format('YYYY-MM-DD') : undefined,
-        ngayKetThuc: values.ngayKetThuc ? values.ngayKetThuc.format('YYYY-MM-DD') : undefined,
-      };
+      const response = await apiFetch(`${API_BASE_URL}/SuDungDichVu/${maSuDung}`, {
+        method: 'DELETE',
+      });
 
-      let res;
-      if (editing) {
-        res = await apiFetch(`${SDDV_API}/${editing.maSuDung}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+      if (response.ok) {
+        message.success('Xóa sử dụng dịch vụ thành công!');
+        fetchSuDungDichVus(pagination.current, pagination.pageSize);
       } else {
-        res = await apiFetch(SDDV_API, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        throw new Error('Failed to delete service usage');
       }
-
-      const resData = await res.json();
-      if (res.ok) {
-        message.success(editing ? 'Cập nhật thành công!' : 'Thêm thành công!');
-        setIsModalVisible(false);
-        syncAll();
-      } else {
-        message.error(resData.message || (editing ? 'Cập nhật thất bại!' : 'Thêm thất bại!'));
-      }
-    } catch (e) {
-      console.error('Error submitting form:', e);
-      message.error(editing ? 'Cập nhật thất bại!' : 'Thêm thất bại!');
+    } catch (error) {
+      console.error('Error deleting service usage:', error);
+      message.error('Không thể xóa sử dụng dịch vụ');
     }
   };
 
   const columns = [
-    { 
-      title: 'Mã sử dụng', 
-      dataIndex: 'maSuDung', 
+    {
+      title: 'Mã sử dụng',
+      dataIndex: 'maSuDung',
       key: 'maSuDung',
-      width: 100
-    },
-    { 
-      title: 'Mã đặt phòng', 
-      dataIndex: 'maDatPhong', 
-      key: 'maDatPhong',
-      width: 120
-    },
-    { 
-      title: 'Tên khách hàng',
-      dataIndex: 'maDatPhong',
-      key: 'tenKhachHang',
-      width: 180,
-      render: (maDatPhong) => getTenKhachHang(maDatPhong)
-    },
-    { 
-      title: 'Mã dịch vụ', 
-      dataIndex: 'maDichVu', 
-      key: 'maDichVu',
-      width: 100
-    },
-    { 
-      title: 'Tên dịch vụ', 
-      dataIndex: 'maDichVu', 
-      key: 'tenDichVu',
-      width: 200,
-      render: (maDichVu) => {
-        const dv = dichVus.find(dv => dv.maDichVu === maDichVu);
-        return dv ? (
-          <Tooltip title={dv.moTa || ''}>{dv.tenDichVu}</Tooltip>
-        ) : maDichVu;
-      }
-    },
-    { 
-      title: 'Đơn giá',
-      dataIndex: 'maDichVu',
-      key: 'donGia',
-      width: 120,
-      align: 'right',
-      render: (maDichVu) => {
-        const donGia = getDonGiaDichVu(maDichVu);
-        return donGia ? `${donGia.toLocaleString('vi-VN')} VNĐ` : '-';
-      }
-    },
-    { 
-      title: 'Số lượng', 
-      dataIndex: 'soLuong', 
-      key: 'soLuong',
-      width: 100,
-      align: 'center'
-    },
-    { 
-      title: 'Ngày sử dụng', 
-      dataIndex: 'ngaySuDung', 
-      key: 'ngaySuDung',
-      width: 120,
-      render: (text) => text ? dayjs(text).format('DD/MM/YYYY') : '-'
-    },
-    { 
-      title: 'Ngày kết thúc', 
-      dataIndex: 'ngayKetThuc', 
-      key: 'ngayKetThuc',
-      width: 120,
-      render: (text) => text ? dayjs(text).format('DD/MM/YYYY') : '-'
-    },
-    { 
-      title: 'Thành tiền', 
-      dataIndex: 'thanhTien', 
-      key: 'thanhTien',
-      width: 150,
-      render: (text) => text ? `${text.toLocaleString('vi-VN')} VNĐ` : '-',
-      align: 'right'
+      sorter: (a, b) => a.maSuDung - b.maSuDung,
     },
     {
-      title: 'Hành động',
+      title: 'Mã đặt phòng',
+      dataIndex: 'maDatPhong',
+      key: 'maDatPhong',
+    },
+    {
+      title: 'Dịch vụ',
+      dataIndex: 'tenDichVu',
+      key: 'tenDichVu',
+    },
+    {
+      title: 'Số lượng',
+      dataIndex: 'soLuong',
+      key: 'soLuong',
+      render: (text) => text?.toLocaleString('vi-VN'),
+    },
+    {
+      title: 'Ngày sử dụng',
+      dataIndex: 'ngaySuDung',
+      key: 'ngaySuDung',
+      render: (text) => text ? dayjs(text).format('DD/MM/YYYY') : '',
+    },
+    {
+      title: 'Ngày kết thúc',
+      dataIndex: 'ngayKetThuc',
+      key: 'ngayKetThuc',
+      render: (text) => text ? dayjs(text).format('DD/MM/YYYY') : '',
+    },
+    {
+      title: 'Thành tiền',
+      dataIndex: 'thanhTien',
+      key: 'thanhTien',
+      render: (text) => text ? `${text.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ',
+    },
+    {
+      title: 'Thao tác',
       key: 'action',
-      width: 150,
       render: (_, record) => (
-        <Space>
-          <Button onClick={() => showEditModal(record)}>Sửa</Button>
-          <Popconfirm 
-            title="Bạn chắc chắn xóa?" 
-            onConfirm={() => handleDelete(record.maSuDung)}
-            okText="Xóa"
-            cancelText="Hủy"
+        <Space size="middle">
+          <Button
+            type="primary"
+            icon={<EditOutlined />}
+            onClick={() => showModal(record)}
           >
-            <Button danger>Xóa</Button>
+            Sửa
+          </Button>
+          <Popconfirm
+            title="Bạn có chắc chắn muốn xóa?"
+            onConfirm={() => handleDelete(record.maSuDung)}
+            okText="Có"
+            cancelText="Không"
+          >
+            <Button
+              type="primary"
+              danger
+              icon={<DeleteOutlined />}
+            >
+              Xóa
+            </Button>
           </Popconfirm>
         </Space>
-      )
-    }
+      ),
+    },
   ];
 
   return (
-    <div style={{padding: 24}}>
-      <h2>Quản lý sử dụng dịch vụ</h2>
-      <Space style={{marginBottom: 16}}>
-        <Button type="primary" onClick={showAddModal}>Thêm sử dụng dịch vụ</Button>
-        <Button onClick={syncAll}>Làm mới</Button>
-      </Space>
-      <Table 
-        columns={columns} 
-        dataSource={data} 
-        rowKey="maSuDung" 
-        loading={loading}
-        pagination={{
-          pageSize: 10,
-          showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} bản ghi`
-        }}
-        scroll={{ x: 1400 }}
-      />
+    <div style={{ padding: 24 }}>
+      <Title level={2}>Quản lý Sử dụng Dịch vụ</Title>
+      
+      <Card>
+        <div style={{ marginBottom: 16 }}>
+          <Space>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => showModal()}
+            >
+              Thêm mới
+            </Button>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => fetchSuDungDichVus(pagination.current, pagination.pageSize)}
+            >
+              Làm mới
+            </Button>
+          </Space>
+        </div>
+
+        <Table
+          columns={columns}
+          dataSource={suDungDichVus}
+          rowKey="maSuDung"
+          pagination={pagination}
+          loading={loading}
+          onChange={handleTableChange}
+          locale={{
+            emptyText: 'Không có dữ liệu'
+          }}
+        />
+      </Card>
+
       <Modal
-        title={editing ? 'Sửa sử dụng dịch vụ' : 'Thêm sử dụng dịch vụ'}
+        title={editingRecord ? "Sửa thông tin sử dụng dịch vụ" : "Thêm sử dụng dịch vụ mới"}
         open={isModalVisible}
-        onCancel={() => {
-          setIsModalVisible(false);
-          form.resetFields();
-        }}
+        onCancel={handleCancel}
         footer={null}
-        destroyOnHidden
+        destroyOnClose
       >
         <Form
           form={form}
           layout="vertical"
-          onFinish={handleOk}
+          onFinish={handleSubmit}
         >
-          <Form.Item 
-            label="Mã đặt phòng" 
-            name="maDatPhong" 
-            rules={[{ required: true, message: 'Chọn mã đặt phòng!' }]}
-          > 
-            <Select placeholder="Chọn mã đặt phòng">
-              {datPhongs.map(dp => (
-                <Select.Option key={dp.maDatPhong} value={dp.maDatPhong}>
-                  {`#${dp.maDatPhong} - ${dp.tenKhachHang || ''}`}
-                </Select.Option>
+          <Form.Item
+            name="maDatPhong"
+            label="Mã đặt phòng"
+            rules={[{ required: true, message: 'Vui lòng chọn mã đặt phòng!' }]}
+          >
+            <Select 
+              placeholder="Chọn mã đặt phòng"
+              loading={loading}
+              notFoundContent={loading ? 'Đang tải...' : 'Không có dữ liệu'}
+            >
+              {Array.isArray(datPhongs) && datPhongs.map(dp => (
+                <Option key={dp.maDatPhong} value={dp.maDatPhong}>
+                  {`${dp.maDatPhong} - Phòng: ${dp.maPhong} - Khách: ${dp.tenKhachHang}`}
+                </Option>
               ))}
             </Select>
           </Form.Item>
-          <Form.Item 
-            label="Mã dịch vụ" 
-            name="maDichVu" 
-            rules={[{ required: true, message: 'Chọn mã dịch vụ!' }]}
-          > 
-            <Select placeholder="Chọn mã dịch vụ">
-              {dichVus.map(dv => (
-                <Select.Option key={dv.maDichVu} value={dv.maDichVu}>
-                  {`#${dv.maDichVu} - ${dv.tenDichVu} (${dv.donGia?.toLocaleString('vi-VN')} VNĐ)`}
-                </Select.Option>
+
+          <Form.Item
+            name="maDichVu"
+            label="Dịch vụ"
+            rules={[{ required: true, message: 'Vui lòng chọn dịch vụ!' }]}
+          >
+            <Select 
+              placeholder="Chọn dịch vụ"
+              loading={loading}
+              notFoundContent={loading ? 'Đang tải...' : 'Không có dữ liệu'}
+            >
+              {Array.isArray(dichVus) && dichVus.map(dv => (
+                <Option key={dv.maDichVu} value={dv.maDichVu}>
+                  {`${dv.tenDichVu} - ${dv.donGia?.toLocaleString('vi-VN')} VNĐ`}
+                </Option>
               ))}
             </Select>
           </Form.Item>
-          <Form.Item 
-            label="Số lượng" 
-            name="soLuong" 
-            rules={[{ required: true, message: 'Nhập số lượng!' }]}
-          > 
-            <InputNumber min={1} style={{width:'100%'}} /> 
+
+          <Form.Item
+            name="soLuong"
+            label="Số lượng"
+            rules={[{ required: true, message: 'Vui lòng nhập số lượng!' }]}
+          >
+            <InputNumber
+              style={{ width: '100%' }}
+              min={1}
+              placeholder="Nhập số lượng"
+            />
           </Form.Item>
-          <Form.Item 
-            label="Ngày sử dụng" 
-            name="ngaySuDung" 
-            rules={[{ required: true, message: 'Chọn ngày sử dụng!' }]}
-          > 
-            <DatePicker format="DD/MM/YYYY" style={{width:'100%'}} /> 
+
+          <Form.Item
+            name="ngaySuDung"
+            label="Ngày sử dụng"
+            rules={[{ required: true, message: 'Vui lòng chọn ngày sử dụng!' }]}
+          >
+            <DatePicker
+              style={{ width: '100%' }}
+              format="DD/MM/YYYY"
+            />
           </Form.Item>
-          <Form.Item 
-            label="Ngày kết thúc" 
+
+          <Form.Item
             name="ngayKetThuc"
-          > 
-            <DatePicker format="DD/MM/YYYY" style={{width:'100%'}} /> 
+            label="Ngày kết thúc"
+          >
+            <DatePicker
+              style={{ width: '100%' }}
+              format="DD/MM/YYYY"
+            />
           </Form.Item>
+
           <Form.Item>
             <Space>
               <Button type="primary" htmlType="submit">
-                {editing ? 'Cập nhật' : 'Thêm mới'}
+                {editingRecord ? 'Cập nhật' : 'Thêm mới'}
               </Button>
-              <Button onClick={() => {
-                setIsModalVisible(false);
-                form.resetFields();
-              }}>
+              <Button onClick={handleCancel}>
                 Hủy
               </Button>
             </Space>
@@ -363,4 +433,4 @@ function SuDungDichVu() {
   );
 }
 
-export default SuDungDichVu;
+export default SuDungDichVu; 
